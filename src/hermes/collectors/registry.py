@@ -14,15 +14,18 @@ from hermes.collectors.blog import BlogCollector
 from hermes.collectors.context7 import Context7Collector
 from hermes.collectors.devto import DevToCollector
 from hermes.collectors.github_releases import GitHubReleaseCollector
+from hermes.collectors.github_topic_search import GithubTopicSearchCollector
 from hermes.collectors.github_trending import GithubTrendingCollector
 from hermes.collectors.hn import HNCollector
 from hermes.collectors.huggingface import HuggingFaceCollector
 from hermes.collectors.lobsters import LobstersCollector
 from hermes.collectors.openreview import OpenReviewCollector
+from hermes.collectors.reddit import RedditCollector
 from hermes.collectors.rss import RSSCollector
 from hermes.collectors.semantic_scholar import SemanticScholarCollector
 from hermes.collectors.tavily_search import TavilySearchCollector
 from hermes.collectors.youtube import YouTubeCollector
+from hermes.collectors.x_twitter import XTwitterCollector
 from hermes.config import CollectorConfig, SearchConfig
 from hermes.logging import get_logger
 
@@ -67,10 +70,30 @@ def _build_collectors() -> dict[str, type[CollectorAdapter]]:
             **kw,
         )},
     )
+    github_topic_search_cls = type(
+        "GithubTopicSearchCollectorConfigured",
+        (GithubTopicSearchCollector,),
+        {"__init__": lambda self, **kw: GithubTopicSearchCollector.__init__(
+            self,
+            github_token=collector_cfg.github_token,
+            **kw,
+        )},
+    )
+    reddit_cls = type(
+        "RedditCollectorConfigured",
+        (RedditCollector,),
+        {"__init__": lambda self, **kw: RedditCollector.__init__(self, **kw)},
+    )
+    x_twitter_cls = type(
+        "XTwitterCollectorConfigured",
+        (XTwitterCollector,),
+        {"__init__": lambda self, **kw: XTwitterCollector.__init__(self, **kw)},
+    )
     return {
         "arxiv": ArxivCollector,
         "rss": RSSCollector,
         "github_trending": GithubTrendingCollector,
+        "github_topic_search": github_topic_search_cls,
         "huggingface": HuggingFaceCollector,
         "blog": BlogCollector,
         "hacker_news": HNCollector,
@@ -83,6 +106,8 @@ def _build_collectors() -> dict[str, type[CollectorAdapter]]:
         "github_releases": github_releases_cls,
         "devto": DevToCollector,
         "lobsters": LobstersCollector,
+        "reddit": reddit_cls,
+        "x_twitter": x_twitter_cls,
     }
 
 

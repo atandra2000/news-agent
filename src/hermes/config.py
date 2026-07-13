@@ -18,6 +18,7 @@ class CollectorConfig(BaseSettings):
             "arxiv",
             "rss",
             "github_trending",
+            "github_topic_search",  # GitHub search API by topic; uses HERMES_GITHUB_TOKEN
             "github_releases",
             "huggingface",
             "blog",
@@ -26,6 +27,8 @@ class CollectorConfig(BaseSettings):
             "openreview",
             "devto",
             "lobsters",
+            "reddit",  # public JSON for r/MachineLearning, r/LocalLLaMA, r/singularity, r/StableDiffusion; per-subreddit timeout + fail-open
+            "x_twitter",  # requires HERMES_X_BEARER_TOKEN; no-ops gracefully if unset
             # "tavily" — opt-in: gated on HERMES_COLLECTOR_TAVILY_API_KEY being set
             # AND the Tavily API quota not being exhausted. Disabled by default so
             # a quota-exhausted key doesn't waste HTTP round-trips on every brief.

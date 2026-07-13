@@ -13,23 +13,70 @@ from hermes.logging import get_logger
 log = get_logger("collector.rss")
 
 # Curated AI/ML feeds; override via HERMES_COLLECTOR_RSS_FEEDS.
+# Grouped by cluster so future maintainers can tell why a feed is on the list.
+# Ponytail: list beats config file; one place to read, no second file to keep in sync.
 DEFAULT_FEEDS = [
-    "https://machinelearningmastery.com/feed/",
-    "https://www.marktechpost.com/feed/",
-    "https://bair.berkeley.edu/blog/feed.xml",
-    "https://deepmind.google/blog/rss.xml",
+    # --- Lab blogs (cited in prompts as Official Sources) ---
     "https://openai.com/news/rss.xml",
+    "https://deepmind.google/blog/rss.xml",
+    "https://blog.google/technology/ai/rss/",
+    "https://www.microsoft.com/en-us/research/feed/",
+    "https://research.facebook.com/feed/",
     "https://huggingface.co/blog/feed.xml",
-    "https://thegradient.pub/rss/",
+    "https://bair.berkeley.edu/blog/feed.xml",
+    "https://ai.meta.com/blog/rss/",
+    "https://www.anthropic.com/news/rss.xml",
+    "https://simonwillison.net/atom/everything/",
     "https://lilianweng.github.io/index.xml",
     "https://distill.pub/rss.xml",
-    "https://blog.google/technology/ai/rss/",
-    "https://research.facebook.com/feed/",
-    "https://www.microsoft.com/en-us/research/feed/",
-    "https://simonwillison.net/atom/everything/",
-    "https://www.interconnects.ai/feed",
+    "https://thegradient.pub/rss/",
     "https://magazine.sebastianraschka.com/feed",
+    "https://www.interconnects.ai/feed",
     "https://aiguide.substack.com/feed",
+    "https://www.marktechpost.com/feed/",
+    "https://machinelearningmastery.com/feed/",
+    "https://nlp.elvissaravia.com/feed",
+    "https://blog.einstein.ai/feed",
+    # --- AI-focused news outlets (cited in prompts as Trusted News Sources) ---
+    "https://www.theinformation.com/feed",  # paywalled; some free posts in feed
+    "https://www.technologyreview.com/feed/",
+    "https://venturebeat.com/category/ai/feed/",
+    "https://techcrunch.com/category/artificial-intelligence/feed/",
+    "https://www.theverge.com/ai-artificial-intelligence/rss/index.xml",
+    "https://arstechnica.com/ai/feed/",
+    "https://www.wired.com/feed/tag/ai/latest/rss",
+    "https://www.theregister.com/headlines.atom",
+    "https://www.zdnet.com/topic/artificial-intelligence/rss.xml",
+    "https://siliconangle.com/category/ai/feed/",
+    "https://thenextweb.com/section/ai/feed/",
+    "https://www.engadget.com/tag/ai/rss.xml",
+    "https://www.thurrott.com/ai/feed",
+    # --- Substacks (cited in prompts as Community Intelligence) ---
+    "https://stratechery.com/feed/",
+    "https://importai.substack.com/feed",
+    "https://www.latent.space/feed",
+    "https://www.deeplearning.ai/the-batch/feed/",
+    "https://bensbites.substack.com/feed",
+    "https://alphasignal.substack.com/feed",
+    "https://thezvi.substack.com/feed",
+    "https://www.oneusefulthing.substack.com/feed",
+    "https://www.aisnakeoil.com/feed",
+    "https://thealgorithmicbridge.substack.com/feed",
+    # --- Hardware-focused (matches ai_hardware_infra brief) ---
+    "https://hpcwire.com/feed/",
+    "https://www.tomshardware.com/feeds/tag/ai/latest",
+    "https://www.anandtech.com/feed",
+    "https://developer.nvidia.com/blog/feed/",
+    "https://rocm.blogs.amd.com/feed",
+    "https://aws.amazon.com/blogs/machine-learning/feed/",
+    # --- Policy / regulation (matches ai_regulation_policy brief) ---
+    "https://www.europarl.europa.eu/rss/documents/topics/AI.xml",
+    "https://www.whitehouse.gov/feed/",
+    "https://digital-strategy.ec.europa.eu/en/rss.xml",
+    # --- Aggregators (catch-all daily AI digests) ---
+    "https://www.therundown.ai/feed",
+    "https://www.superhuman.ai/feed",
+    "https://www.aiweekly.co/rss.xml",
 ]
 
 ATOM = "{http://www.w3.org/2005/Atom}"
