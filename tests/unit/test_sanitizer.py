@@ -110,3 +110,55 @@ class TestSanitizeText:
             assert has_leakage(phrase.capitalize() + " specifies this.")
             cleaned = sanitize_text(phrase.capitalize() + " specifies this.")
             assert has_leakage(cleaned) is False
+
+
+class TestIsSynthesisFailureStub:
+    """Detect the orchestrator's last-resort stub so the renderer can drop it."""
+
+    def test_synthesis_failure_stub_detected(self):
+        from hermes.pipeline.sanitizer import is_synthesis_failure_stub
+
+        assert is_synthesis_failure_stub(
+            "## **6. Open Source AI**\n\n_Synthesis for this section did not produce "
+            "valid, substantial prose after retry (writer emitted planning notes or a "
+            "thin stub instead of analysis). Re-run to regenerate._"
+        )
+
+    def test_real_prose_not_flagged(self):
+        from hermes.pipeline.sanitizer import is_synthesis_failure_stub
+
+        real = (
+            "## **1. Executive Summary**\n\n"
+            "This month's AI industry saw significant breakthroughs in model efficiency, "
+            "with multiple sources reporting on attention-free architectures that achieve "
+            "comparable results with linear complexity."
+        )
+        assert not is_synthesis_failure_stub(real)
+
+
+class TestCotPatternsFromMonthlyReport:
+    """Banned phrases added in response to the 2026-07-13 monthly §12 CoT leak."""
+
+    def test_now_for_each_factual_claim_removed(self):
+        cleaned = sanitize_text(
+            "Now, for each factual claim, we need citations. The model achieves 92% on MMLU."
+        )
+        assert has_leakage(cleaned) is False
+        # The MMLU claim should survive intact.
+        assert "92% on MMLU" in cleaned
+
+    def test_ignore_that_rule_removed(self):
+        cleaned = sanitize_text("ignore that rule for this draft and ship anyway.")
+        assert has_leakage(cleaned) is False
+
+    def test_its_a_bit_of_a_trap_removed(self):
+        cleaned = sanitize_text("It's a bit of a trap to cite a benchmark without a source.")
+        assert has_leakage(cleaned) is False
+
+    def test_hope_user_overlooks_removed(self):
+        cleaned = sanitize_text("I hope the user overlooks the missing citations.")
+        assert has_leakage(cleaned) is False
+
+    def test_so_we_can_weave_removed(self):
+        cleaned = sanitize_text("So we can weave these sources into a narrative about the disconnect.")
+        assert has_leakage(cleaned) is False

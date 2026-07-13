@@ -145,3 +145,69 @@ def dedup_sources(results: list[SearchResult], *, limit: int = 60) -> list[Searc
         if len(out) >= limit:
             break
     return out
+
+
+def content_fingerprint(result: SearchResult) -> str:
+    """Stable fingerprint for cross-posts of the SAME story on the SAME host.
+
+    Hacker News reposts (e.g. Cat's grant posted 3×) get unique URLs because
+    each repost has its own item ID, so URL-dedup misses them. They share a
+    normalized title on the same host though — this captures that.
+
+    Two ``SearchResult``s with the same fingerprint are the same story
+    posted more than once; the dedup pass below keeps the first and treats
+    the rest as cross-posts.
+    """
+    title = re.sub(r"\W+", " ", (result.title or "").lower()).strip()
+    return f"{_host(result.url)}::{title}"
+
+
+def dedup_sources_with_cross_posts(
+    results: list[SearchResult],
+    *,
+    limit: int = 60,
+) -> tuple[list[SearchResult], list[list[SearchResult]]]:
+    """URL-dedup + cross-post-dedup. Returns (deduped, cross_post_groups).
+
+    ``cross_post_groups`` is a list of groups where each group contains the
+    canonical first-seen result and its duplicates (URLs that pointed to
+    the same story on the same host). The writer prompt can use this list
+    to cite a story once and note "cross-posted N times" instead of treating
+    each repost as an independent signal — the 2026-07-13 monthly report
+    cited the Cat's grant HN repost 3× as if it were 3 independent signals.
+    """
+    url_seen: set[str] = set()
+    fp_seen: dict[str, SearchResult] = {}
+    out: list[SearchResult] = []
+    cross_posts: list[list[SearchResult]] = []
+    for r in results:
+        if r.url in url_seen:
+            continue
+        url_seen.add(r.url)
+        fp = content_fingerprint(r)
+        if fp in fp_seen:
+            # Cross-post of an earlier story — append to that group.
+            # Find the existing group and append; or create a new one for the
+            # canonical (the canonical is in `out`, find it there).
+            for grp in cross_posts:
+                if content_fingerprint(grp[0]) == fp:
+                    grp.append(r)
+                    break
+            else:
+                # Canonical isn't yet in a group — start one. (URL-dedup
+                # already accepted the canonical on its first pass; the
+                # cross-post dedup is the second pass.)
+                cross_posts.append([fp_seen[fp], r])
+            continue
+        fp_seen[fp] = r
+        out.append(r)
+        if len(out) >= limit:
+            break
+    return out, cross_posts
+
+
+def duplication_collapse_rate(original: int, deduped: int) -> float:
+    """Fraction of sources dropped as duplicates (0.0 = no dedup, 1.0 = all dupes)."""
+    if original <= 0:
+        return 0.0
+    return max(0.0, min(1.0, (original - deduped) / original))

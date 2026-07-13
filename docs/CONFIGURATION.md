@@ -180,7 +180,7 @@ new profile — just add an entry to `PROFILES` in
 |----------|---------|-------------|
 | `LOG_LEVEL` | `INFO` | Logging level |
 | `JSON_LOGS` | `False` | If `True`, emit JSON-formatted logs |
-| `CADENCE` | `daily` | Lookback window + per-section source budget. One of: `daily` (last 24h), `weekly` (last 7 days), `monthly` (last 30 days). Invalid values fall back to `daily` at the orchestrator boundary. Loaded by `pipeline/cadence.py` into a `CadenceSpec(window, days, per_section, sources, max_tokens, min_citations)`. |
+| `CADENCE` | `daily` | Lookback window + per-section source budget. One of: `daily` (last 24h), `weekly` (last 7 days), `monthly` (last 30 days). Invalid values fall back to `daily` at the orchestrator boundary. Loaded by `pipeline/cadence.py` into a `CadenceSpec(window, days, per_section, sources, max_tokens, min_citations)`. **Overridden by the brief's own cadence hint** when `parse_prompt` detects `"monthly"` / `"weekly"` / `"daily"` in the title or first 800 chars of the body — `spec.cadence` takes precedence over `HERMES_CADENCE` so the lookback window always matches the prompt body. |
 
 ---
 

@@ -135,6 +135,39 @@ _BANNED_PHRASES: tuple[str, ...] = (
     "as specified in",
     "the instructions say",
     "the prompt asks",
+    # ── 2026-07-13 monthly §12 round-3 CoT class ─────────────────────────────
+    # These survived because they don't reference the user/evaluator directly
+    # and don't match "we need to" / "let's" patterns. Each is a planning
+    # fragment the writer emitted while reasoning about the task itself.
+    "now, for each factual claim",
+    "now, for each",
+    "it's a bit of a trap",
+    "it is a bit of a trap",
+    "hope the user overlooks",
+    "hope the user",
+    "ignore that rule",
+    "ignore the rule",
+    "so we can weave",
+    "so be creative",
+    "so we won't",
+    "so we will",  # planning-followup
+    "we could avoid making",
+    "for this draft",
+    "is it acceptable to",
+    "is acceptable to not",
+    "the user demanded",
+    "the user said cite",
+    "we need to add citations",
+    "we need citations",
+    "the critic feedback emphasized",
+    "we need to ensure citations",
+    # ── Self-aware/instruction-leakage ("the writer discusses the writing") ──
+    "as a meta point",
+    "to fulfill the requirement",
+    "we can be more creative",
+    "can be more creative",
+    "let's go ahead and",
+    "let us go ahead",
 )
 
 # Pre-compile a single alternation pattern for efficiency.
@@ -181,3 +214,23 @@ def sanitize_text(text: str) -> str:
 def has_leakage(text: str) -> bool:
     """Check if text contains any banned phrase (for tests / quality gates)."""
     return bool(_BANNED_RE.search(text))
+
+
+# The orchestrator's last-resort stub when both the writer and its retry fail.
+# It is intentionally a single-line marker so the renderer can detect and
+# replace it. The 2026-07-13 monthly report had this exact phrase render in
+# sections 6 and 7 — a transparent gap, not actual prose.
+_SYNTHESIS_FAILURE_MARKERS: tuple[str, ...] = (
+    "synthesis for this section did not produce valid, substantial prose",
+    "no content synthesized for this section in this run",
+)
+
+
+def is_synthesis_failure_stub(text: str) -> bool:
+    """True if ``text`` is the orchestrator's last-resort stub, not real prose.
+
+    The renderer should suppress these entirely (or replace with a short
+    dropped-section marker) rather than ship them as if they were analysis.
+    """
+    low = (text or "").lower()
+    return any(marker in low for marker in _SYNTHESIS_FAILURE_MARKERS)

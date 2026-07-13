@@ -162,8 +162,9 @@ Archive of rendered reports.
 | `md_sha256` | String(64) | Content hash |
 | `sections_count` | Integer | |
 | `items_analyzed` | Integer | |
-| `sources_checked_json` | Text (JSON) | |
-| `sources_failed_json` | Text (JSON) | |
+| `sources_checked_json` | Text (JSON) | Real collector names that ran. Populated by `_gather_sources_fallback` returning `(results, checked, failed)`. |
+| `sources_failed_json` | Text (JSON) | Real collector names that failed (timeout / exception). |
+| `duplication_collapse_rate` | Float, default 0.0 | Fraction of sources dropped as URL or cross-post duplicates (0.0 = no dedup, 1.0 = all dupes). Computed by `search.py::duplication_collapse_rate` over the raw→deduped delta. Auto-migrated by `_add_missing_columns()`. |
 | `token_usage` | Integer | |
 | `created_at` | DateTime | |
 

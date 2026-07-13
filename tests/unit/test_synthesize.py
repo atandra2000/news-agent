@@ -48,6 +48,89 @@ def test_select_relevant_respects_domain_cap():
     assert hosts.count("a.com") <= 2
 
 
+def test_source_priority_boost_official_beats_community():
+    """An arxiv item must outrank an HN item on the same paper (Scope 8).
+
+    Without source-priority boost, a high-keyword-match HN comment on a paper
+    can outrank the arxiv abstract for the same paper. With the boost, arxiv
+    wins because the brief lists research sources above community.
+    """
+    sources = [
+        # HN comment with strong keyword match (would win on raw keyword score).
+        SearchResult(
+            title="Discussion of alpha on Hacker News",
+            url="https://news.ycombinator.com/item?id=1",
+            content="alpha alpha alpha beta beta",
+            source="hacker_news",
+        ),
+        # arxiv abstract with the same content but lower raw keyword density.
+        SearchResult(
+            title="Alpha: a new method",
+            url="https://arxiv.org/abs/0001",
+            content="We present alpha. A short abstract.",
+            source="arxiv",
+        ),
+    ]
+    picked = select_relevant(_sec(), sources, top_k=2)
+    # arxiv must come first despite the HN comment having more keyword matches.
+    assert picked[0].url == "https://arxiv.org/abs/0001"
+    assert picked[1].url.startswith("https://news.ycombinator.com")
+
+
+def test_diversity_floor_swaps_for_unseen_source_types():
+    """When top_k would otherwise return one source type, swap for variety.
+
+    Mirrors the 2026-07-13 bug: 12 HN items would win over 12 items spread
+    across 4 source types. With min_source_types=3, the result must include
+    at least 3 distinct source types.
+    """
+    sources = (
+        [SearchResult(title=f"hn{i}", url=f"https://hn/{i}",
+                      content="alpha beat beat beat", source="hacker_news")
+         for i in range(6)]
+        + [SearchResult(title=f"arxiv{i}", url=f"https://arxiv/{i}",
+                        content="alpha study", source="arxiv")
+           for i in range(3)]
+        + [SearchResult(title=f"hf{i}", url=f"https://hf/{i}",
+                        content="alpha model", source="huggingface")
+           for i in range(2)]
+        + [SearchResult(title=f"rss{i}", url=f"https://rss/{i}",
+                        content="alpha news", source="rss")
+           for i in range(2)]
+    )
+    picked = select_relevant(_sec(), sources, top_k=8, min_source_types=3)
+    types = {s.source for s in picked}
+    assert len(types) >= 3, f"Expected ≥3 source types in picked set, got {types}"
+
+
+def test_diversity_floor_no_swap_when_already_diverse():
+    """If top_k already covers min_source_types, no swap is needed."""
+    sources = (
+        [SearchResult(title=f"a{i}", url=f"https://arxiv/{i}",
+                      content="alpha study", source="arxiv")
+         for i in range(3)]
+        + [SearchResult(title=f"h{i}", url=f"https://hn/{i}",
+                        content="alpha news", source="hacker_news")
+           for i in range(3)]
+        + [SearchResult(title=f"r{i}", url=f"https://rss/{i}",
+                        content="alpha news", source="rss")
+           for i in range(3)]
+    )
+    picked = select_relevant(_sec(), sources, top_k=6, min_source_types=3)
+    types = {s.source for s in picked}
+    # Already diverse, picked set should be untouched in composition.
+    assert types == {"arxiv", "hacker_news", "rss"}
+
+
+def test_source_priority_boost_known_values():
+    from hermes.pipeline.synthesize import source_priority_boost
+    assert source_priority_boost("arxiv") >= 4
+    assert source_priority_boost("openai") >= 5
+    assert source_priority_boost("hacker_news") == 1
+    assert source_priority_boost("unknown_source") == 0
+    assert source_priority_boost(None) == 0
+
+
 def test_clean_section_text_drops_planning_lines():
     text = (
         "## **1. Pulse**\n\n"

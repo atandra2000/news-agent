@@ -43,7 +43,48 @@ def _score_source(kws: set[str], s: SearchResult, recency_days: int | None) -> i
             score += 2
         if w in body:
             score += 1
-    return score + _recency_bonus(s, recency_days)
+    score += _recency_bonus(s, recency_days)
+    # Source-priority boost: official/research sources outrank community ones.
+    # Without this, a high-keyword-match HN comment on a paper outranks the
+    # arxiv abstract for the same paper. Scope 8: pull from the priority
+    # tiers the brief listed.
+    score += source_priority_boost(s.source)
+    return score
+
+
+# ── Source-priority boost (Scope 8) ─────────────────────────────────────────
+# Prompts list "Official Sources" / "Research Sources" / "Trusted News Sources" /
+# "Community Intelligence" in priority order. The default scoring here rewards
+# keyword matches + recency but treats all sources equally — for a brief that
+# says "Use arXiv as primary", an arxiv item must outrank an HN comment on the
+# same paper. This map applies a per-source bonus at scoring time. The 2026-07-13
+# monthly report had 110 arxiv items, 94 huggingface items, 90 RSS items in the
+# DB and the report cited zero of them — pure HN + GitHub Trending won. The
+# fix is a numeric boost, not a hard filter: keyword match still matters.
+_SOURCE_PRIORITY_BOOST: dict[str, int] = {
+    # Official sources (highest weight — these are the brief's primary tier).
+    "openai": 5, "anthropic": 5, "google_deepmind": 5, "google_ai": 5,
+    "microsoft_ai": 5, "meta_ai": 5, "xai": 5, "nvidia": 5, "amd": 5,
+    "intel": 5, "apple_ml": 5, "amazon_aws_ai": 5, "ibm_research": 5,
+    "huggingface": 4, "mistral": 5, "deepseek": 5, "qwen": 5, "moonshot": 5,
+    "minimax": 5, "zhipu": 5, "perplexity": 5, "groq": 5, "cerebras": 5,
+    "databricks": 5, "cohere": 5,
+    # Research sources.
+    "arxiv": 4, "semantic_scholar": 4, "openreview": 4,
+    "papers_with_code": 3, "context7": 3,
+    # Trusted news.
+    "rss": 2, "tavily": 2, "blog": 2,
+    # Community intelligence (lowest weight — useful for sentiment, not facts).
+    "hacker_news": 1, "github_trending": 1, "github_releases": 1,
+    "devto": 1, "lobsters": 1, "bluesky": 1, "youtube": 1,
+}
+
+
+def source_priority_boost(source: str | None) -> int:
+    """Return the priority boost for a source_type. 0 for unknown."""
+    if not source:
+        return 0
+    return _SOURCE_PRIORITY_BOOST.get(source.lower(), 0)
 
 
 def select_relevant(
@@ -53,12 +94,18 @@ def select_relevant(
     top_k: int = 12,
     domain_cap: int = 3,
     recency_days: int | None = None,
+    min_source_types: int = 3,
 ) -> list[SearchResult]:
     """Pick the ``top_k`` sources most relevant to a section.
 
-    Scoring: keyword hits (title weighted 2x body) plus a recency bonus. Selection
-    is then domain-diversified — at most ``domain_cap`` sources from any single
-    host — so one outlet cannot dominate a section.
+    Scoring: keyword hits (title weighted 2x body) + recency bonus + source-priority
+    boost. Selection is then domain-diversified — at most ``domain_cap`` sources
+    from any single host — so one outlet cannot dominate a section. A
+    ``min_source_types`` floor ensures the picked set spans multiple source
+    types when possible; without it, a section whose top-12 are all from HN
+    would still be returned even though the brief asked for cross-source
+    coverage (the 2026-07-13 monthly report's disease: every cited source
+    was HN or GitHub Trending despite 110 arxiv items in the DB).
     """
     if not sources:
         return []
@@ -87,14 +134,53 @@ def select_relevant(
 
     picked: list[SearchResult] = []
     per_host: dict[str, int] = {}
+    per_type: dict[str, int] = {}
     for s in ranked:
         host = s.source or _host(s.url)
         if domain_cap and per_host.get(host, 0) >= domain_cap:
             continue
         picked.append(s)
         per_host[host] = per_host.get(host, 0) + 1
+        src_type = s.source or "unknown"
+        per_type[src_type] = per_type.get(src_type, 0) + 1
         if len(picked) >= top_k:
             break
+
+    # Diversity floor: if we picked top_k but only N source types (N < min_source_types)
+    # and the broader pool has more variety, swap the lowest-priority items
+    # for new source types. The 2026-07-13 monthly report's bug: top_k items
+    # all from HN + GitHub Trending despite 13 source types in the DB.
+    if min_source_types and len(per_type) < min_source_types and len(ranked) > top_k:
+        existing_types = set(per_type.keys())
+        existing_urls = {s.url for s in picked}
+        # One swap-in pass: find candidates from unseen source types.
+        for s in ranked:
+            if s.url in existing_urls:
+                continue
+            src_type = s.source or "unknown"
+            if src_type in existing_types:
+                continue
+            # Find the lowest-priority item to drop (last picked, lowest score).
+            # We just take the LAST one — selection is already scored.
+            if not picked:
+                break
+            dropped = picked.pop()
+            per_type[dropped.source or "unknown"] -= 1
+            if per_type[dropped.source or "unknown"] <= 0:
+                per_type.pop(dropped.source or "unknown", None)
+            picked.append(s)
+            existing_urls.add(s.url)
+            existing_types.add(src_type)
+            per_type[src_type] = per_type.get(src_type, 0) + 1
+            if len(per_type) >= min_source_types:
+                break
+        # Restore order: highest-priority first.
+        # Recompute scores for stable sort.
+        if kws:
+            rescored = [(_score_source(kws, s, recency_days), s) for s in picked]
+            rescored.sort(key=lambda x: x[0], reverse=True)
+            picked = [s for _, s in rescored]
+
     return picked
 
 
@@ -161,9 +247,10 @@ OUTPUT RULES — FOLLOW EXACTLY:
 - Do NOT invent model names, release dates, funding figures, benchmark numbers, or quotes that are not supported by the retrieved sources.
 - When the section compares entities (models, hardware, companies, funding rounds), use a Markdown comparison table.
 - For every factual claim, append the citation token [src:EXACT_URL] using the exact URL of the supporting source above. Multiple claims may cite the same source.
+- CITATION DISCIPLINE — CRITICAL: every factual claim must be EITHER cited with [src:URL] OR explicitly tagged as unsourced. When you include a fact from industry knowledge (e.g. "LangSmith was launched by LangChain in 2023", "RAGAS was developed by the community") that is NOT in the retrieved sources above, append the marker [unsourced — industry knowledge] right after the claim. This is the only acceptable way to use parametric knowledge: make it visible to the reader. Never present unsourced facts as if they were cited evidence.
 - Clearly distinguish facts, analysis, estimates, rumors, and community sentiment. Prefer primary sources. Quantify where possible (funding, performance, pricing, dates).
 - Maximize depth and analytical insight. Do not pad with filler. Produce a substantive, comprehensive section; do not emit thin stubs.
-- Before output, self-check: (1) no planning/first-person language, (2) every bullet covered, (3) every factual claim has a [src:URL] citation, (4) all dates and developments fall within the REPORT CADENCE window above.
+- Before output, self-check: (1) no planning/first-person language, (2) every bullet covered, (3) every factual claim has either a [src:URL] citation or an [unsourced — industry knowledge] tag, (4) all dates and developments fall within the REPORT CADENCE window above.
 
 Write only the final section now."""
 

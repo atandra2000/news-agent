@@ -33,17 +33,17 @@ htmlcov/
 *.swo
 *~
 
-# Project-local runtime state
-/storage/                # SQLite db, run manifests, vectors, reports, quality, adapter_state
-/remember/               # internal session memory (now.md, recent.md, archive.md, logs/, tmp/)
-/claude/                 # local Claude Code settings
-/superpowers/            # sdd/ task briefs and plans
-**/.claude
-**/.superpowers
-**/.remember
+# Project-local runtime state at the repo root. `src/hermes/storage/` is the
+# SQLAlchemy package and is tracked normally; the runtime `storage/` dir
+# holds the SQLite DB, run manifests, vectors, reports, and adapter state.
+# The leading slash anchors the pattern so `src/hermes/storage/` is NOT
+# matched.
+/storage/
+.claude/
+.superpowers/
+.remember/
 
 # Build / packaging
 *.egg
 *.whl
 pip-wheel-metadata/
-storage/

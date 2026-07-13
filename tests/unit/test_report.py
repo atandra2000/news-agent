@@ -112,6 +112,242 @@ def test_assemble_does_not_strip_real_src_tokens():
     assert len(rep.references) == 2
 
 
+def test_assemble_replaces_synthesis_failure_stub():
+    # The orchestrator emits this exact phrase when the writer + retry both fail.
+    # The 2026-07-13 monthly report shipped it as if it were real prose in §6 and
+    # §7. The renderer must replace it with a transparent "section omitted" marker
+    # rather than ship the phrase as analysis.
+    spec = BriefSpec(
+        title="T",
+        sections=[
+            SectionSpec(number=6, title="Open Source AI"),
+            SectionSpec(number=7, title="Hardware & Infrastructure"),
+        ],
+    )
+    fail_stub = (
+        "## **6. Open Source AI**\n\n"
+        "_Synthesis for this section did not produce valid, substantial prose "
+        "after retry (writer emitted planning notes or a thin stub instead of "
+        "analysis). Re-run to regenerate._"
+    )
+    rep = assemble_report(spec, [fail_stub, ""], [])
+    # The fail-stub phrase must NOT appear in the final report.
+    assert "synthesis for this section did not produce" not in rep.text.lower()
+    # A short "section omitted" marker replaces it.
+    assert "section omitted" in rep.text.lower()
+    # Section 7 still gets its normal empty placeholder (different code path).
+    assert rep.text.count("No content synthesized") == 1
+
+
+class TestCitationDiscipline:
+    """Distinguish cited evidence from parametric-knowledge filler.
+
+    The 2026-07-13 monthly §3 rendered a LangSmith/RAGAS/OpenAI Evals
+    comparison table with the inline disclaimer that it was 'industry
+    knowledge as of mid-2026' — visible to a careful reader, but not
+    separated from cited claims. Scope 5: writer prompt instructs the
+    model to mark unsourced claims with [unsourced — industry knowledge];
+    audit_citation_discipline reports how many sentences have citations,
+    how many are tagged, and how many are NEITHER (potential fabrications).
+    """
+
+    def test_audit_counts_cited_sentences(self):
+        from hermes.pipeline.report import audit_citation_discipline
+        body = (
+            "OpenAI released a new model [src:https://x/1]. "
+            "The model achieves 92% on MMLU [src:https://x/2]. "
+            "The benchmark suite is widely used in industry."
+        )
+        out = audit_citation_discipline(body)
+        assert out["cited"] == 2
+        assert out["unsourced"] == 0
+        assert out["unmarked"] == 1
+
+    def test_audit_counts_unsourced_tagged_sentences(self):
+        from hermes.pipeline.report import audit_citation_discipline
+        body = (
+            "LangSmith was launched by LangChain in 2023 [unsourced — industry knowledge]. "
+            "RAGAS is an open-source RAG evaluation framework [unsourced — industry knowledge]."
+        )
+        out = audit_citation_discipline(body)
+        assert out["cited"] == 0
+        assert out["unsourced"] == 2
+        assert out["unmarked"] == 0
+
+    def test_audit_handles_mixed(self):
+        from hermes.pipeline.report import audit_citation_discipline
+        body = (
+            "OpenAI released a new model [src:https://x/1]. "
+            "LangSmith is a paid product [unsourced — industry knowledge]. "
+            "The framework supports custom evaluators."  # unmarked — flagged
+        )
+        out = audit_citation_discipline(body)
+        assert out["cited"] == 1
+        assert out["unsourced"] == 1
+        assert out["unmarked"] == 1
+        assert out["total"] == 3
+
+    def test_writer_prompt_instructs_unsourced_marker(self):
+        """The writer prompt must explicitly tell the model to mark unsourced
+        claims so the audit pass can count them. Otherwise audit_citation_discipline
+        returns 0 unsourced for everything (false reassurance)."""
+        from hermes.pipeline.synthesize import build_section_prompt
+        from hermes.pipeline.spec import SectionSpec
+        sec = SectionSpec(number=3, title="Frontier Models", bullets=["release dates"])
+        prompt = build_section_prompt(sec, [], "instructions", ["quality"], "July 2026")
+        assert "unsourced" in prompt.lower()
+        assert "industry knowledge" in prompt.lower()
+
+
+class TestRequiredDeliverablesGate:
+    """The Required Deliverables list is parsed from the prompt but was never
+    enforced. The 2026-07-13 monthly report's deliverables ('Model comparison
+    matrix', 'Funding tables', 'Benchmark comparison tables', 'Key statistics')
+    were largely missing, with no surface area telling the reader. This gate
+    appends a 'Coverage Check' section listing any missing deliverable."""
+
+    def test_missing_deliverable_surfaced(self):
+        from hermes.pipeline.spec import BriefSpec, SectionSpec
+        spec = BriefSpec(
+            title="T",
+            sections=[SectionSpec(number=1, title="Exec")],
+            deliverables=["Model comparison matrix", "Funding tables", "Benchmark comparison tables"],
+        )
+        # The report has no tables, no model comparison, no funding, no benchmark
+        # table — all three are missing.
+        md = "## **1. Exec**\nThis report has no tables at all. [src:https://x/1]"
+        rep = assemble_report(spec, [md], _sources())
+        assert "Required Deliverables" in rep.text
+        assert "Coverage Check" in rep.text
+        assert "Model comparison matrix" in rep.text
+        assert "Funding tables" in rep.text
+        assert "Benchmark comparison tables" in rep.text
+
+    def test_present_deliverable_not_listed_as_missing(self):
+        from hermes.pipeline.spec import BriefSpec, SectionSpec
+        spec = BriefSpec(
+            title="T",
+            sections=[SectionSpec(number=1, title="Exec")],
+            deliverables=["Model comparison matrix", "Funding tables"],
+        )
+        # The report has a model comparison table; funding is missing.
+        md = (
+            "## **1. Exec**\n\n"
+            "## **Model comparison matrix**\n\n"
+            "| Model | Org | Score |\n|---|---|---|\n| A | X | 90 |\n"
+        )
+        rep = assemble_report(spec, [md], _sources())
+        # Funding tables is missing → listed in coverage check.
+        assert "Funding tables" in rep.text
+        # Model comparison matrix is present → NOT in the missing list.
+        # The text appears in the report body, so we look at the *missing* list
+        # specifically (it should not appear under the "missing" bullet).
+        assert "Required Deliverables" in rep.text
+        assert "- Model comparison matrix" not in rep.text
+
+    def test_no_coverage_check_when_all_deliverables_present(self):
+        from hermes.pipeline.spec import BriefSpec, SectionSpec
+        spec = BriefSpec(
+            title="T",
+            sections=[SectionSpec(number=1, title="Exec")],
+            deliverables=["Executive summary"],
+        )
+        md = "## **1. Exec**\nSome prose. [src:https://x/1]"
+        rep = assemble_report(spec, [md], _sources())
+        # All deliverables present → no coverage check tail.
+        assert "Coverage Check" not in rep.text
+
+    def test_check_required_deliverables_returns_structured(self):
+        from hermes.pipeline.report import check_required_deliverables
+        checks = check_required_deliverables(
+            ["Model comparison matrix", "Nonexistent thing"],
+            "## **1. Exec**\nThis has a model comparison matrix.\n\n| Model | Score |\n|---|---|\n",
+        )
+        assert checks[0].found is True
+        assert checks[0].deliverable == "Model comparison matrix"
+        assert checks[1].found is False
+        assert checks[1].deliverable == "Nonexistent thing"
+
+
+class TestThinCorpusBanner:
+    """The 2026-07-13 monthly report had 20 sources for 13 sections (≈1.5/section)
+    with no banner telling the reader the corpus was thin. The thin-corpus
+    banner distinguishes 'nothing happened' from 'we didn't see anything'."""
+
+    def test_thin_corpus_banner_emitted_when_few_sources(self):
+        from hermes.pipeline.coverage import CoverageVerdict
+        from hermes.pipeline.report import assemble_report
+        from hermes.pipeline.spec import BriefSpec, SectionSpec
+        spec = BriefSpec(
+            title="T",
+            sections=[SectionSpec(number=i, title=f"Sec {i}") for i in range(1, 14)],
+        )
+        # 20 sources for 13 sections → thin. (5*13 = 65 threshold.)
+        sources = [_sources()[0]] * 2  # actually use a single distinct source repeated
+        # Use distinct URLs to avoid the URL-dedup that assemble_report doesn't
+        # do but the runner does. assemble_report only dedups via resolve_citations.
+        sources = [
+            SearchResult(title=f"src{i}", url=f"https://x/{i}", source="ex.com")
+            for i in range(20)
+        ]
+        # 5 CRITICAL verdicts → thin banner fires.
+        verdicts = [
+            CoverageVerdict(
+                section_number=i, section_title=f"Sec {i}",
+                verdict="CRITICAL" if i <= 5 else "OK",
+                sources_in_section=0 if i <= 5 else 5,
+                categories_present=("community",),
+                required_category=None,
+            )
+            for i in range(1, 14)
+        ]
+        sections = [f"## **{i}. Sec {i}**\nBody for section {i}. [src:https://x/{i % 20}]"
+                    for i in range(1, 14)]
+        rep = assemble_report(spec, sections, sources, verdicts=verdicts)
+        assert "Thin-corpus run" in rep.text
+        assert "20 sources for 13 sections" in rep.text
+        # 5 critical sections are mentioned in the banner.
+        assert "5 section" in rep.text
+
+    def test_thin_corpus_banner_absent_on_healthy_run(self):
+        from hermes.pipeline.coverage import CoverageVerdict
+        from hermes.pipeline.report import assemble_report
+        from hermes.pipeline.spec import BriefSpec, SectionSpec
+        spec = BriefSpec(
+            title="T",
+            sections=[SectionSpec(number=i, title=f"Sec {i}") for i in range(1, 4)],
+        )
+        sources = [
+            SearchResult(title=f"src{i}", url=f"https://x/{i}", source="ex.com")
+            for i in range(30)  # 30 sources for 3 sections = 10/section → healthy
+        ]
+        verdicts = [
+            CoverageVerdict(
+                section_number=i, section_title=f"Sec {i}",
+                verdict="OK", sources_in_section=10,
+                categories_present=("official", "research", "news"),
+                required_category=None,
+            )
+            for i in range(1, 4)
+        ]
+        sections = [f"## **{i}. Sec {i}**\nBody for section {i}." for i in range(1, 4)]
+        rep = assemble_report(spec, sections, sources, verdicts=verdicts)
+        assert "Thin-corpus run" not in rep.text
+
+    def test_thin_corpus_banner_helper_thresholds(self):
+        from hermes.pipeline.report import thin_corpus_banner
+        # 5 sections × 5 threshold = 25 sources needed for "healthy" → 20 is thin.
+        banner = thin_corpus_banner(total_sources=20, section_count=5, critical_sections=0)
+        assert "Thin-corpus run" in banner
+        # 5 sections × 5 = 25 → exactly at threshold, still emits because <
+        # (the condition is `total_sources < thin_threshold * section_count`).
+        banner_at = thin_corpus_banner(total_sources=25, section_count=5, critical_sections=0)
+        assert "Thin-corpus run" not in banner_at
+        # Any CRITICAL also triggers the banner even if total is high.
+        banner_crit = thin_corpus_banner(total_sources=50, section_count=5, critical_sections=2)
+        assert "Thin-corpus run" in banner_crit
+
+
 # ── drop_empty_subheadings + validity gate (round-2 fixes) ─────────────────────
 
 

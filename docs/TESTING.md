@@ -22,7 +22,7 @@
 .venv/bin/python -m pytest tests/unit/test_llm.py::TestRouter::test_token_budget_guard -v
 ```
 
-**Current status: 227 tests, all passing, ~2.5s runtime.**
+**Current status: 237 tests, all passing, ~3.8s runtime.**
 
 ---
 
@@ -33,17 +33,25 @@ tests/
 ├── conftest.py          # Autouse structlog isolation + fake_ctx fixture
 ├── helpers.py           # FakeRouter, _settings, _fake_items (shared)
 ├── unit/
-│   ├── test_core.py             # dedup, embedder, collector registry
-│   ├── test_llm.py              # catalog, roles, registry, router, providers (HTTP mocked)
-│   ├── test_cli.py              # arg parsing, command dispatch, _parse_date
-│   ├── test_quality.py          # quality stage: heuristic + LLM judge + run_quality
-│   ├── test_sinks.py            # MarkdownFileSink + ObsidianSink + build_sinks
-│   ├── test_brief_spec.py       # brief Markdown parser (uses example_prompt.md)
-│   ├── test_brief_citations.py  # citation resolution + report assembly
-│   └── test_brief_planner.py    # query planner
+│   ├── test_cadence.py              # CadenceSpec + resolve_cadence + daily/weekly/monthly shape
+│   ├── test_cli.py                  # arg parsing, command dispatch, _parse_date
+│   ├── test_core.py                 # dedup, embedder, collector registry
+│   ├── test_coverage.py             # OK/THIN/CRITICAL verdict (Scope 2)
+│   ├── test_cross_post_dedup.py     # content_fingerprint + cross-post groups (Scope 4)
+│   ├── test_embed.py                # hashing embedder shape/length/determinism
+│   ├── test_llm.py                  # catalog, roles, registry, router, providers (HTTP mocked)
+│   ├── test_new_collectors.py       # registry contract for new collectors
+│   ├── test_orchestrator_observability.py  # sources_checked / sources_failed plumbed (Scope 7)
+│   ├── test_planner.py              # query planner
+│   ├── test_quality.py              # quality stage: heuristic + LLM judge + run_quality
+│   ├── test_report.py               # assemble_report, citation audit, deliverables gate, thin banner
+│   ├── test_sanitizer.py            # CoT scrub + synthesis-failure stub detection (Scope 3)
+│   ├── test_sinks.py                # MarkdownFileSink + ObsidianSink + build_sinks
+│   ├── test_spec.py                 # parse_prompt + cadence detection (Scope 1)
+│   └── test_synthesize.py           # select_relevant + priority boost + diversity floor (Scope 8)
 ├── integration/
-│   ├── test_brief_run.py        # brief pipeline: search + RAG + research loop + cadences
-│   └── test_extended.py         # source breadth, profiles, sinks, planning, KG, pipeline
+│   ├── test_extended.py             # source breadth, profiles, sinks, planning, KG, pipeline
+│   └── test_news_run.py             # orchestrator end-to-end with a real prompt
 ```
 
 ---
@@ -170,36 +178,112 @@ Used by `test_extended.py`, `test_quality.py`.
 - ObsidianSink: frontmatter, sinks meta, noop when vault=None, name attr.
 - build_sinks: always markdown, obsidian when vault set, excluded when None.
 
-### `test_brief_run.py` (4 tests)
+### `test_spec.py` (10 tests)
 
-- Brief pipeline with search: title, sections, citations, references.
-- Brief pipeline no search.
-- Research loop fills thin citations.
-- Daily/weekly/monthly cadences.
+- `parse_prompt` parses title, sections, bullets, deliverables, quality.
+- **Cadence detection (Scope 1):** monthly / weekly / daily hints,
+  no-hint returns None, longer/more specific cadences win when both
+  are present.
 
-### `test_brief_spec.py` (5 tests)
+### `test_synthesize.py` (18 tests)
 
-- Parses title, 18 sections, section bullets, prioritized sources,
-  deliverables + quality. Uses `example_prompt.md`.
+- `select_relevant`: keyword ranking, domain cap.
+- **Source-priority boost (Scope 8):** known values, arxiv outranks
+  HN on the same paper.
+- **Diversity floor:** swaps for unseen source types when
+  `min_source_types=3` and the picked set is dominated by HN; no-op
+  when already diverse.
+- `clean_section_text`: drops planning lines, rejects no-heading /
+  planning-only.
+- `_content_word_count`: excludes headings and tables.
+- `is_substantial_section`: true for real prose, false for stubs.
+- `count_citations`: unique-URL count.
+- `extract_prose` + sanitizer: CoT scratchpad dropped, no-op when no
+  heading, leading scratchpad heading skipped, "heading-first
+  dithering" collapsed to the last occurrence, legit repeated
+  subheadings survive.
 
-### `test_brief_citations.py` (5 tests)
+### `test_sanitizer.py` (23 tests)
 
-- Citation reordering by first appearance, drops unknown sources, tolerates URL
-  noise, appends references, no references when none.
+- All banned phrases (planning markers + round-3 CoT class from
+  Scope 3) are scrubbed.
+- **Synthesis-failure stub detection (Scope 3):**
+  `is_synthesis_failure_stub` returns True for the orchestrator's
+  last-resort placeholder, False for real prose.
 
-### `test_brief_planner.py` (3 tests)
+### `test_coverage.py` (8 tests)
+
+- Source-type → category mapping (official / research / news /
+  community).
+- `_section_required_category`: title-hint matching.
+- `evaluate_coverage`: OK when required category has ≥5 sources,
+  CRITICAL when 0, THIN in between.
+- Universal sections (Executive Summary, Month Timeline, Predictions)
+  have `required_category=None` and pass on any source.
+- Realistic monthly report scenario.
+
+### `test_cross_post_dedup.py` (8 tests)
+
+- URL-dedup still works.
+- Cross-post detection: 3 HN reposts of the same story collapse to 1
+  canonical + 1 cross-post group of 2 duplicates.
+- Different stories with similar titles are kept separate.
+- Cross-post only fires on the same host (different hosts = different
+  stories).
+- `content_fingerprint` normalizes whitespace / strips apostrophes.
+- `duplication_collapse_rate`: 0.0 for no dedup, 1.0 for all dupes.
+- `limit` caps the deduped output.
+
+### `test_orchestrator_observability.py` (2 tests)
+
+- `_gather_sources_fallback` returns `(results, checked, failed)` —
+  even with no collectors, the 3-tuple shape holds.
+- A successful collector is recorded in `checked`; a failing one
+  is recorded in `failed`.
+
+### `test_report.py` (35 tests)
+
+- Citation resolution: reordering by first appearance, drops unknown
+  sources, tolerates URL noise, appends references, no references
+  when none.
+- **Citation discipline (Scope 5):** `audit_citation_discipline`
+  counts cited / unsourced / unmarked sentences.
+- **Required Deliverables gate (Scope 6):** `check_required_deliverables`
+  finds / misses each brief deliverable; `format_missing_deliverables_note`
+  renders the Coverage Check tail.
+- **Thin-corpus banner (Scope 9):** emits the `⚠️` banner when
+  sources/section < 5 or any section is CRITICAL; suppresses when
+  the corpus is healthy.
+- Stub-renderer behavior: `is_synthesis_failure_stub` triggers the
+  dropped-section marker, empty writer output triggers a
+  different marker.
+- `drop_empty_subheadings`: removes stub subheadings + placeholders.
+
+### `test_cadence.py` (10 tests)
+
+- `CadenceSpec` table has 3 entries (daily/weekly/monthly).
+- Daily shape (`days=1`, `per_section=…`, `max_tokens=5000`).
+- `max_tokens` and `sources` scale with the lookback window.
+- `resolve_cadence`: valid strings map correctly; invalid / unknown
+  / None falls back to daily.
+
+### `test_planner.py` (3 tests)
 
 - Section + source queries, respects caps, year in query.
 
-### `test_extended.py` (5 tests)
+### `test_extended.py` (3 tests)
 
-- New collectors registered, profiles exist, sinks (Obsidian), planning gates
-  research, research partial-tolerant, KG query.
+- New collectors registered, profiles exist, sinks (Obsidian).
 
 ### `test_core.py` (5 tests)
 
 - SimHash near-dup, Deduper, Embedder normalized, collector registry,
   run_collector skip-on-failure.
+
+### `test_news_run.py` (1 test, integration)
+
+- `run_news_pipeline` writes a report file for a simple prompt
+  (uses `fake_ctx` + in-memory store; offline).
 
 ---
 

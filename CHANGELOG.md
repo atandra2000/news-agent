@@ -8,6 +8,74 @@ semantic versioning in spirit (the package is pre-1.0).
 
 ## [Unreleased] — 2026-07-13
 
+### Report-quality fixes (2026-07-14)
+
+The 2026-07-13 monthly `ai-state-of-the-industry` report exposed a
+family of failure modes that the basic critic loop didn't cover. This
+release closes 9 of them in one coherent set of changes. See
+[docs/REPORT_QUALITY_REVIEW.md](docs/REPORT_QUALITY_REVIEW.md) for the
+full post-mortem of the failing report and the minimum change for each
+fix.
+
+- **Scope 1 — Cadence → lookback wiring** (`pipeline/spec.py`,
+  `pipeline/orchestrator.py`). `BriefSpec.cadence` is now detected from
+  the prompt body (`"monthly"`, `"past 30 days"`, …) and the
+  orchestrator prefers it over `HERMES_CADENCE`. A "monthly" prompt
+  body is no longer overridden by a `daily` env setting.
+- **Scope 2 — Source coverage verdict** (`pipeline/coverage.py` — new,
+  193 LoC). Per-section OK/THIN/CRITICAL classification by category
+  (research / official / news / community). The orchestrator
+  short-circuits CRITICAL sections with a transparent "section
+  omitted" marker instead of burning an LLM call on a doomed attempt.
+- **Scope 3 — Sanitizer (placeholders + round-3 CoT)**
+  (`pipeline/sanitizer.py`, `pipeline/report.py`). ~30 new banned
+  phrases under the "2026-07-13 monthly §12 round-3 CoT class" header
+  ("now, for each factual claim", "ignore that rule", "so we can
+  weave", "let us go ahead", "the user demanded", …). New
+  `is_synthesis_failure_stub()` detector replaces the
+  orchestrator's last-resort placeholder with a clean dropped-section
+  marker instead of shipping it as if it were real prose.
+- **Scope 4 — Cross-post dedup** (`pipeline/search.py`,
+  `storage/models.py`). `content_fingerprint()` keyed on
+  `(host, normalized_title)` collapses HN-style reposts
+  (unique URLs, same story on the same host) into one canonical +
+  a cross-post group. `duplication_collapse_rate` (0.0–1.0) is now
+  persisted on the `Report` row and auto-migrated by
+  `_add_missing_columns()`.
+- **Scope 5 — Citation discipline** (`pipeline/synthesize.py`,
+  `pipeline/report.py`). Writer prompt now requires every factual
+  claim to be EITHER cited with `[src:URL]` OR explicitly tagged
+  `[unsourced — industry knowledge]`. `audit_citation_discipline()`
+  counts cited / unsourced / unmarked sentences for the manifest.
+- **Scope 6 — Required Deliverables gate** (`pipeline/report.py`).
+  `check_required_deliverables()` soft-checks each entry in
+  `spec.deliverables` against the rendered text. Missing items are
+  appended as a "Required Deliverables — Coverage Check" tail so the
+  gap is transparent to readers.
+- **Scope 7 — Run manifest observability** (`pipeline/orchestrator.py`).
+  `_gather_sources_fallback` returns
+  `(results, sources_checked, sources_failed)` so the `Report` row's
+  `sources_checked_json` / `sources_failed_json` are no longer
+  hardcoded to `[]`.
+- **Scope 8 — Source-priority boost + diversity floor**
+  (`pipeline/synthesize.py`). New `_SOURCE_PRIORITY_BOOST` map
+  (official_labs=5, research=4, news=2, community=1) added to
+  `_score_source`. New `min_source_types=3` parameter on
+  `select_relevant` enforces a diversity floor so a section cannot be
+  dominated by HN even when 110 arxiv items exist in the corpus.
+- **Scope 9 — Thin-corpus banner** (`pipeline/report.py`).
+  `thin_corpus_banner()` emits a "⚠️ Thin-corpus run" callout at
+  the top of the report when `sources/section < 5` or any section is
+  CRITICAL.
+
+**Test count:** 191 → 237 (+46 tests across 7 files; 3 new files).
+
+**Behavior:** changes to the report body — added CoT sanitization,
+unsourced-marker rendering, dropped-section markers, source-priority
+boost, diversity floor, cross-post collapse, deliverables gate, and
+thin-corpus banner. The brief path is unchanged when the corpus is
+healthy and the prompt is well-formed.
+
 ### Tavily outage routing (2026-07-14)
 
 Tavily API quota exhausted for the month. Routes around it without code

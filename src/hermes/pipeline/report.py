@@ -6,6 +6,7 @@ import re
 from dataclasses import dataclass
 from typing import Iterable
 
+from hermes.pipeline.sanitizer import is_synthesis_failure_stub
 from hermes.pipeline.search import SearchResult
 from hermes.pipeline.spec import BriefSpec
 
@@ -83,6 +84,149 @@ _LABEL_BRACKET_RE = re.compile(
 )
 
 
+# Unsourced-claim marker the writer is instructed to append when using
+# parametric knowledge that isn't in the retrieved sources. Visible to
+# readers so they can tell cited evidence from contextual filler.
+_UNSOURCED_MARKER_RE = re.compile(
+    r"\[unsourced\s*[—–-]\s*industry\s*knowledge\]",
+    re.IGNORECASE,
+)
+
+
+def audit_citation_discipline(body: str) -> dict[str, int]:
+    """Count cited vs unsourced-vs-unmarked sentences.
+
+    Heuristic: split body into sentences, count how many contain a [src:URL]
+    token vs an [unsourced — industry knowledge] marker vs neither. Sentences
+    with NEITHER a citation NOR an unsourced marker are potential fabrications.
+
+    Returns a small dict so callers (eval, reporter) can surface this in the
+    manifest. The function is cheap; do not over-engineer.
+    """
+    # Strip citation/unsourced tokens before splitting to count them per sentence.
+    # We split on `.!?` followed by whitespace, but ignore dots inside URLs/numbers.
+    sentences = re.split(r"(?<=[.!?])\s+", body)
+    cited = unsourced = unmarked = 0
+    src_re = re.compile(r"\[src:[^\]]+\]")
+    for s in sentences:
+        if not s.strip():
+            continue
+        has_src = bool(src_re.search(s))
+        has_unsourced = bool(_UNSOURCED_MARKER_RE.search(s))
+        if has_src:
+            cited += 1
+        elif has_unsourced:
+            unsourced += 1
+        else:
+            unmarked += 1
+    return {"cited": cited, "unsourced": unsourced, "unmarked": unmarked, "total": cited + unsourced + unmarked}
+
+
+# Maps deliverable keywords (lowercased) to required presence of a
+# corresponding content element in the report. The 2026-07-13 monthly prompt
+# listed "Model comparison matrix" / "Funding tables" / "Benchmark comparison
+# tables" / "Key statistics" as required — but the report had only a
+# competitor-comparison table inside §3 and a funding table inside §8, with
+# no gate to surface the missing ones. The gate below is a soft check: if
+# a deliverable is required, the report must contain at least one table OR
+# a subheading whose text mentions the deliverable's keyword.
+_DELIVERABLE_KEYWORDS: dict[str, tuple[str, ...]] = {
+    "executive summary": ("## **1. executive", "## **1.", "## **executive"),
+    "model comparison": ("model comparison", "| model", "| developer"),
+    "funding table": ("funding", "| entity", "| amount"),
+    "benchmark comparison": ("benchmark", "| benchmark"),
+    "key statistics": ("key statistics",),
+    "strategic conclusion": ("strategic conclusion",),
+    "month timeline": ("timeline", "## **2.", "## **month"),
+    "full analytical report": ("analytical", "## **"),
+    "comparison matrix": ("comparison", "|"),
+}
+
+
+@dataclass
+class DeliverableCheck:
+    deliverable: str
+    found: bool
+    matched_keyword: str | None
+
+
+def check_required_deliverables(
+    deliverables: list[str],
+    report_text: str,
+) -> list[DeliverableCheck]:
+    """Soft check: which deliverables have a matching element in the report?
+
+    Returns a list with one entry per deliverable. Used by the orchestrator
+    to surface missing deliverables at the end of the report so the gap is
+    transparent to readers (the 2026-07-13 monthly report had no model
+    comparison matrix, no funding table outside §8, no benchmark table —
+    and nothing told the reader any of these were missing).
+    """
+    low = report_text.lower()
+    checks: list[DeliverableCheck] = []
+    for d in deliverables:
+        d_low = d.lower().strip()
+        # Find the best-matching keyword group for this deliverable.
+        matched = None
+        for keyword_group_key, candidates in _DELIVERABLE_KEYWORDS.items():
+            if keyword_group_key in d_low:
+                for c in candidates:
+                    if c.lower() in low:
+                        matched = c
+                        break
+                break
+        # If no keyword group matched, do a direct substring search.
+        if matched is None and d_low and d_low in low:
+            matched = d_low
+        checks.append(DeliverableCheck(deliverable=d, found=matched is not None, matched_keyword=matched))
+    return checks
+
+
+def format_missing_deliverables_note(checks: list[DeliverableCheck]) -> str:
+    """Render a short 'Missing Deliverables' note for the report tail.
+
+    Empty string when nothing is missing — the gate is invisible on a clean run.
+    """
+    missing = [c for c in checks if not c.found]
+    if not missing:
+        return ""
+    lines = ["", "## **Required Deliverables — Coverage Check**", ""]
+    lines.append("The following deliverables from the brief's Required Deliverables list were not detected in the report:")
+    for c in missing:
+        lines.append(f"- {c.deliverable}")
+    lines.append("")
+    lines.append("_This gate surfaces missing deliverables explicitly so readers can request a re-run with the missing sections filled._")
+    return "\n".join(lines)
+
+
+def thin_corpus_banner(
+    *,
+    total_sources: int,
+    section_count: int,
+    critical_sections: int,
+    thin_threshold: int = 5,
+) -> str:
+    """Emit a thin-corpus banner at the top of a report when evidence is sparse.
+
+    The 2026-07-13 monthly report had 20 sources for 13 sections → ~1.5/section,
+    well below the bar for a real monthly industry brief. A banner at the top
+    makes the limitation visible to readers, distinguishing it from a normal
+    report where the absence of mention simply means nothing happened.
+
+    Returns "" when the corpus is healthy; a short banner string otherwise.
+    """
+    if total_sources >= thin_threshold * section_count and critical_sections == 0:
+        return ""
+    per_section = total_sources / max(1, section_count)
+    if total_sources < thin_threshold * section_count or critical_sections > 0:
+        return (
+            f"> ⚠️ **Thin-corpus run**: {total_sources} sources for {section_count} sections "
+            f"(≈{per_section:.1f}/section); {critical_sections} section(s) omitted due to "
+            f"insufficient evidence. Re-run with broader search/collectors for fuller coverage."
+        )
+    return ""
+
+
 def _strip_label_brackets(body: str) -> str:
     """Remove non-URL citation fig-leaves before citation resolution."""
     return _LABEL_BRACKET_RE.sub("", body)
@@ -157,6 +301,7 @@ def assemble_report(
     spec: BriefSpec,
     sections_markdown: Iterable[str],
     sources: list[SearchResult],
+    verdicts: list | None = None,
 ) -> AssembledReport:
     """Combine the title, synthesized sections, and a references section.
 
@@ -173,6 +318,15 @@ def assemble_report(
                 f"## **{section.number}. {section.title}**\n\n"
                 f"_No content synthesized for this section in this run "
                 f"(empty writer output). Re-run to fill the gap._"
+            )
+        elif is_synthesis_failure_stub(md):
+            # The orchestrator's last-resort stub renders as if it were real
+            # prose. Replace with a single-line "section omitted" marker so
+            # the gap is transparent to readers (the 2026-07-13 monthly
+            # report had this exact phrase render in §6 and §7).
+            md = (
+                f"## **{section.number}. {section.title}**\n\n"
+                f"_Section omitted: synthesis failed after retry in this run._"
             )
         else:
             md = drop_empty_subheadings(md)
@@ -192,6 +346,35 @@ def assemble_report(
     full = resolved_body
     if ref_block:
         full = full.rstrip() + "\n\n" + ref_block + "\n"
+
+    # Required Deliverables gate: append a "Coverage Check" tail listing any
+    # brief-mandated deliverables that didn't make it into the report. The
+    # 2026-07-13 monthly report's "Required Deliverables" list (model
+    # comparison matrix, funding tables, benchmark comparison tables, etc.)
+    # was never enforced — the gap is invisible to readers without this gate.
+    if spec.deliverables:
+        checks = check_required_deliverables(spec.deliverables, full)
+        note = format_missing_deliverables_note(checks)
+        if note:
+            full = full.rstrip() + "\n" + note + "\n"
+
+    # Thin-corpus banner: a top-of-report callout when sources-per-section is
+    # too low to support real analysis. Distinguishes "nothing happened" from
+    # "we didn't see anything" — the 2026-07-13 report had 20 sources for 13
+    # sections and a thin banner makes that visible.
+    critical_count = sum(1 for v in (verdicts or []) if v.verdict == "CRITICAL")
+    banner = thin_corpus_banner(
+        total_sources=len(sources),
+        section_count=len(spec.sections),
+        critical_sections=critical_count,
+    )
+    if banner:
+        # Insert just after the title heading.
+        title_line = f"## **{spec.title}**"
+        if title_line in full:
+            full = full.replace(title_line, f"{title_line}\n\n{banner}", 1)
+        else:
+            full = banner + "\n" + full
 
     return AssembledReport(
         title=spec.title,

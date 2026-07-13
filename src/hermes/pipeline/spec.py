@@ -24,6 +24,10 @@ class BriefSpec:
     deliverables: list[str] = field(default_factory=list)
     quality: list[str] = field(default_factory=list)
     raw: str = ""
+    # Cadence parsed from the brief body (e.g. "monthly" in the title or
+    # "the past 30 days" in instructions). Orchestrator uses this in preference
+    # to HERMES_CADENCE so the lookback window matches the prompt.
+    cadence: str | None = None
 
 
 _H1 = re.compile(r"^#\s+(.*)$")
@@ -31,6 +35,15 @@ _H2 = re.compile(r"^##\s+(.*)$")
 _SECTION = re.compile(r"^##\s+(\d+)\.\s+(.*)$")
 _BULLET = re.compile(r"^[-*]\s+(.*)$")
 _NUM = re.compile(r"\d+")
+
+# Cadence detection: scan the title + the first 800 chars of the body for
+# the strongest cadence hint. The prompt body is the authoritative source;
+# HERMES_CADENCE env is a fallback.
+_CADENCE_HINTS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("monthly", ("monthly", "month in review", "the past 30 days", "30-day", "30 day")),
+    ("weekly", ("weekly", "week in review", "the past 7 days", "7-day", "7 day")),
+    ("daily", ("daily", "today", "the last 24 hours", "24-hour", "24 hour")),
+)
 
 
 def _blocks(md: str) -> list[tuple[str, int, int]]:
@@ -94,6 +107,22 @@ def _slug(title: str) -> str:
     return s or "brief"
 
 
+def _detect_cadence(text: str) -> str | None:
+    """Best-effort cadence detection from prompt body.
+
+    Returns one of ``"daily" | "weekly" | "monthly"`` or ``None`` if no hint
+    matches. The first hint that appears in the text wins (longer/more
+    specific cadences are checked first so "the past 30 days" beats "the
+    past 7 days" if both are present).
+    """
+    low = text.lower()
+    for cadence, hints in _CADENCE_HINTS:
+        for hint in hints:
+            if hint in low:
+                return cadence
+    return None
+
+
 def parse_prompt(md: str) -> BriefSpec:
     lines = md.splitlines()
     blocks = _blocks(md)
@@ -101,7 +130,7 @@ def parse_prompt(md: str) -> BriefSpec:
         raise ValueError("Brief has no '# ' title heading.")
 
     title = blocks[0][0]
-    spec = BriefSpec(title=title, raw=md)
+    spec = BriefSpec(title=title, raw=md, cadence=_detect_cadence(md))
 
     by_title = {t.lower(): (s, e) for (t, s, e) in blocks}
 

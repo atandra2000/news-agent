@@ -6,7 +6,7 @@
 
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-252%20passing-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-237%20passing-brightgreen.svg)](tests/)
 
 **Version 0.1.0** · Python ≥ 3.11 · SQLite + httpx + structlog · Author: Atandra Bharati
 
@@ -104,7 +104,7 @@ hermes eval example_prompt.md --rate 4
 > virtualenv's Python (`.venv/bin/python`), because the base `python`/`python3`
 > may lack `structlog` and the dev extras:
 > ```bash
-> .venv/bin/python -m pytest tests/ -q      # 252 tests, offline, no network/LLM
+> .venv/bin/python -m pytest tests/ -q      # 237 tests, offline, no network/LLM
 > .venv/bin/python -m ruff check src tests
 > ```
 
@@ -176,7 +176,7 @@ hermes/
 │   ├── output.py              # Sinks: MarkdownFileSink + ObsidianSink
 │   └── profiles.py            # daily / weekly / minimal / deep_dive / trend_report
 ├── docs/                      # This documentation set (see index below)
-├── tests/                     # 286 tests (unit + integration), offline
+├── tests/                     # 237 tests (unit + integration), offline
 ├── prompts/                   # Example brief prompts
 ├── scheduler/                 # launchd / systemd / cron templates
 └── storage/                   # SQLite DB, reports, manifests, quality (gitignored)
@@ -190,6 +190,7 @@ hermes/
 |----------|--------|
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | System architecture, module map, data flow, component contracts, design decisions |
 | [docs/PIPELINE.md](docs/PIPELINE.md) | pipeline stages, evidence graph, story blueprint, bounded self-critique |
+| [docs/REPORT_QUALITY_REVIEW.md](docs/REPORT_QUALITY_REVIEW.md) | 2026-07-13 monthly report post-mortem — the 9 report-quality scopes |
 | [docs/CONFIGURATION.md](docs/CONFIGURATION.md) | Every env var, settings groups, profiles, `.env` reference |
 | [docs/COLLECTORS.md](docs/COLLECTORS.md) | Collector registry, source list, adding a new collector |
 | [docs/LLM_PROVIDERS.md](docs/LLM_PROVIDERS.md) | Catalog, roles, tiers, provider wiring, reasoning-starvation pitfall |
@@ -234,7 +235,7 @@ hermes/
 | LLM | Ollama / OpenCode Go / OpenAI-compatible | Role-routed fallback chain, per-tier catalog |
 | Search | Tavily (optional) | Brief pipeline live web research |
 | Templates | Jinja2 | Versioned prompt templates |
-| Testing | pytest + pytest-asyncio + respx | 252 tests, offline, no network/LLM server |
+| Testing | pytest + pytest-asyncio + respx | 237 tests, offline, no network/LLM server |
 
 ---
 

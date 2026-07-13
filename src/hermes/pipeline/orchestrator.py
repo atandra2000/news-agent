@@ -19,7 +19,14 @@ from hermes.pipeline.cadence import CadenceSpec, resolve_cadence
 from hermes.pipeline.planner import plan_queries
 from hermes.pipeline.report import assemble_report
 from hermes.pipeline.retrieval import embed_chunks, format_rag_context, load_past_reports, retrieve_similar
-from hermes.pipeline.search import SearchProvider, SearchResult, build_search_provider, dedup_sources
+from hermes.pipeline.search import (
+    SearchProvider,
+    SearchResult,
+    build_search_provider,
+    dedup_sources,
+    dedup_sources_with_cross_posts,
+    duplication_collapse_rate,
+)
 from hermes.pipeline.spec import BriefSpec
 from hermes.pipeline.synthesize import (
     _SECTION_MIN_WORDS,
@@ -88,17 +95,27 @@ async def _gather_sources_fallback(
     since: datetime,
     *,
     max_sources: int,
-) -> list[SearchResult]:
-    """Pull from free collectors when Tavily returns nothing."""
+) -> tuple[list[SearchResult], list[str], list[str]]:
+    """Pull from free collectors when Tavily returns nothing.
+
+    Returns ``(results, sources_checked, sources_failed)`` so the orchestrator
+    can persist real observability data into the run manifest. Previously
+    fallback path always recorded ``[]`` for both fields, hiding which
+    collectors actually ran.
+    """
     from hermes.collectors.registry import run_collector
 
     out: list[SearchResult] = []
+    sources_checked: list[str] = []
+    sources_failed: list[str] = []
     for name in _FALLBACK_COLLECTORS:
         try:
             items = await run_collector(name, since=since, limit=20, timeout=20)
         except Exception as exc:  # noqa: BLE001
             log.warning("fallback_collector_failed", name=name, error=str(exc))
+            sources_failed.append(name)
             continue
+        sources_checked.append(name)
         for it in items:
             if not it.url:
                 continue
@@ -113,7 +130,7 @@ async def _gather_sources_fallback(
             )
         if len(out) >= max_sources * 2:
             break
-    return out
+    return out, sources_checked, sources_failed
 
 
 async def _synthesize_section_parallel(
@@ -134,11 +151,29 @@ async def _synthesize_section_parallel(
     search_enabled: bool,
     semaphore: asyncio.Semaphore,
     max_tokens: int = 5000,
+    coverage_verdict: str | None = None,
 ) -> str:
-    """Synthesize one section with RAG context + critic loop + CoT backstop."""
+    """Synthesize one section with RAG context + critic loop + CoT backstop.
+
+    ``coverage_verdict`` is one of "OK" / "THIN" / "CRITICAL" / None (unknown).
+    CRITICAL sections are short-circuited to a transparent "section omitted"
+    marker — the writer cannot synthesize from nothing, and we don't want to
+    burn an LLM call on a doomed attempt. THIN sections proceed but the writer
+    is told the corpus is thin so it can be honest about gaps.
+    """
     from hermes.pipeline.report import drop_empty_subheadings
     from hermes.pipeline.sanitizer import sanitize_text
     from hermes.pipeline.synthesize import extract_prose
+
+    # Short-circuit CRITICAL: no useful evidence for this section. Drop it
+    # transparently instead of forcing the writer to invent.
+    if coverage_verdict == "CRITICAL":
+        log.warning("section_critical_drop", section=sec.number, title=sec.title)
+        return (
+            f"## **{sec.number}. {sec.title}**\n\n"
+            f"_Section omitted: source coverage verdict is CRITICAL "
+            f"(insufficient retrieved evidence to write a real analysis for this section)._"
+        )
 
     async with semaphore:
         rag_context = ""
@@ -227,7 +262,12 @@ async def run_news_pipeline(
 ) -> Path:
     """The one Hermes production command. Run a parsed brief end to end."""
     settings = settings or load_settings()
-    cad = resolve_cadence(settings.cadence)
+    # Cadence precedence: prompt body > HERMES_CADENCE env > "daily".
+    # parse_prompt already detected cadence from the brief; use that as the
+    # authoritative source so a "monthly" brief gets a 30-day lookback even
+    # if the env is set to "daily".
+    effective_cadence = spec.cadence or settings.cadence
+    cad = resolve_cadence(effective_cadence)
     router = router or _build_router(settings)
     search = search or build_search_provider(settings.search, days=cad.days)
 
@@ -245,20 +285,53 @@ async def run_news_pipeline(
     year = str(run_date.year)
     queries = plan_queries(
         spec, per_section=cad.per_section, source_queries=cad.sources,
-        year=year, cadence=settings.cadence,
+        year=year, cadence=effective_cadence,
     )
-    log.info("planned", queries=len(queries), sections=len(spec.sections), cadence=settings.cadence)
+    log.info("planned", queries=len(queries), sections=len(spec.sections), cadence=effective_cadence)
 
     # Search.
-    sources: list[SearchResult] = await _gather_sources(queries, search, max_sources=cad.sources * 5)
-    log.info("searched", sources=len(sources))
+    sources: list[SearchResult] = []
+    sources_checked: list[str] = []
+    sources_failed: list[str] = []
+    raw_count = 0
+    cross_post_groups: list[list[SearchResult]] = []
+    try:
+        raw = await _gather_sources(queries, search, max_sources=cad.sources * 5)
+        raw_count = len(raw)
+        # URL-dedup + cross-post-dedup. Cat's-grant-style HN reposts (3 IDs,
+        # same story) collapse to one signal here; the cross_post_groups list
+        # tells the writer to cite once and note "cross-posted N times".
+        sources, cross_post_groups = dedup_sources_with_cross_posts(raw, limit=cad.sources * 5)
+        sources_checked.append(search.__class__.__name__)
+        collapse_rate = duplication_collapse_rate(raw_count, len(sources))
+        log.info(
+            "searched",
+            raw=raw_count, deduped=len(sources), collapse_rate=round(collapse_rate, 3),
+            cross_post_groups=len(cross_post_groups),
+        )
+    except Exception as exc:  # noqa: BLE001
+        sources_failed.append(search.__class__.__name__)
+        log.warning("search_failed", error=str(exc))
 
     if not sources:
         log.warning("search_empty_fallback_collectors")
         since = run_date - timedelta(days=cad.days)
-        fb = await _gather_sources_fallback(since, max_sources=cad.sources * 5)
-        sources = dedup_sources(fb, limit=cad.sources * 5)
-        log.info("fallback_used", sources=len(sources))
+        fb, fb_checked, fb_failed = await _gather_sources_fallback(since, max_sources=cad.sources * 5)
+        # Apply the same cross-post dedup to fallback-collected items; the
+        # Cat's-grant HN items would otherwise slip through the fallback path
+        # un-collapsed.
+        fb_deduped, fb_cross_posts = dedup_sources_with_cross_posts(fb, limit=cad.sources * 5)
+        sources = fb_deduped
+        cross_post_groups.extend(fb_cross_posts)
+        sources_checked.extend(fb_checked)
+        sources_failed.extend(fb_failed)
+        collapse_rate = duplication_collapse_rate(len(fb), len(sources))
+        log.info(
+            "fallback_used",
+            sources=len(sources), checked=len(fb_checked), failed=len(fb_failed),
+            collapse_rate=round(collapse_rate, 3),
+            cross_post_groups=len(fb_cross_posts),
+        )
 
     # RAG.
     rag_chunks = []
@@ -275,6 +348,19 @@ async def run_news_pipeline(
     )
     extra_queries = adapter_state.extra_queries if adapter_state else settings.search.extra_queries
 
+    # Coverage verdicts: per-section OK/THIN/CRITICAL classification based on
+    # the retrieved corpus. Drives both writer-prompt honesty and CRITICAL
+    # short-circuit (no LLM call when there's nothing to write about).
+    from hermes.pipeline.coverage import evaluate_coverage
+    verdicts = evaluate_coverage(spec, sources)
+    verdict_by_num = {v.section_number: v for v in verdicts}
+    log.info(
+        "coverage_verdicts",
+        ok=sum(1 for v in verdicts if v.verdict == "OK"),
+        thin=sum(1 for v in verdicts if v.verdict == "THIN"),
+        critical=sum(1 for v in verdicts if v.verdict == "CRITICAL"),
+    )
+
     # Parallel synthesis.
     semaphore = asyncio.Semaphore(settings.pipeline.section_concurrency)
     max_tokens = cad.max_tokens
@@ -283,12 +369,13 @@ async def run_news_pipeline(
             sec, sources, rag_chunks, embedder, router, search, spec, settings,
             cad, date_label, cadence_note, per_section_sources, extra_queries,
             year, True, semaphore, max_tokens=max_tokens,
+            coverage_verdict=verdict_by_num.get(sec.number).verdict if sec.number in verdict_by_num else None,
         )
         for sec in spec.sections
     ]
     sections_md = await asyncio.gather(*tasks)
 
-    report = assemble_report(spec, list(sections_md), sources)
+    report = assemble_report(spec, list(sections_md), sources, verdicts=verdicts)
 
     if out_path is None:
         from hermes.pipeline.spec import brief_slug
@@ -317,8 +404,16 @@ async def run_news_pipeline(
                     md_sha256=hashlib.sha256(report.text.encode("utf-8")).hexdigest(),
                     sections_count=len(spec.sections),
                     items_analyzed=len(sources),
-                    sources_checked_json=json.dumps([]),
-                    sources_failed_json=json.dumps([]),
+                    # Plumb the actual collectors/queries that ran — was hardcoded
+                    # to json.dumps([]) before, hiding observability gaps.
+                    sources_checked_json=json.dumps(sorted(set(sources_checked))),
+                    sources_failed_json=json.dumps(sorted(set(sources_failed))),
+                    # Fraction of raw sources dropped as URL or cross-post dupes.
+                    # 0.0 means no dedup, 1.0 means all raw results were dupes.
+                    duplication_collapse_rate=duplication_collapse_rate(
+                        raw_count + sum(len(g) for g in cross_post_groups),
+                        len(sources),
+                    ),
                     token_usage=router.stats.total_tokens,
                 )
             )
