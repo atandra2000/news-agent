@@ -29,8 +29,17 @@ class _FakeItem:
         self.published_at = datetime.now(timezone.utc)
 
 
-async def test_fallback_returns_three_tuple():
-    """Even with no collectors, the function returns (results, checked, failed)."""
+async def test_fallback_returns_three_tuple(monkeypatch):
+    """Even with no collectors, the function returns (results, checked, failed).
+
+    The fallback fan-out is now driven by CollectorConfig.enabled (17 names by
+    default). To keep this unit test fast and offline, we monkeypatch
+    _resolve_fallback_collectors to a 3-collector stub — the *shape* of the
+    return value is what we care about here, not the breadth of fan-out.
+    """
+    from hermes.pipeline import orchestrator
+
+    monkeypatch.setattr(orchestrator, "_resolve_fallback_collectors", lambda: ("arxiv", "hacker_news", "devto"))
     out, checked, failed = await _gather_sources_fallback(
         since=datetime.now(timezone.utc) - timedelta(days=1),
         max_sources=4,

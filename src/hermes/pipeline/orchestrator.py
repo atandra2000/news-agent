@@ -8,7 +8,7 @@ import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from hermes.config import HermesSettings, load_settings
+from hermes.config import CollectorConfig, HermesSettings, load_settings
 from hermes.llm.embed import Embedder
 from hermes.llm.providers.registry import build_registry
 from hermes.llm.router import LLMRouter
@@ -51,6 +51,23 @@ _FALLBACK_COLLECTORS = (
     "devto",
     "lobsters",
 )
+
+
+def _resolve_fallback_collectors() -> tuple[str, ...]:
+    """Resolve the fallback collector list at runtime from CollectorConfig.enabled.
+
+    Hardcoded 7-tuple above is the historical minimum; the live list may be
+    longer if the user enables new collectors (e.g. reddit, github_topic_search,
+    x_twitter) in their .env. Tavily is excluded because the fallback runs when
+    tavily returns nothing — re-running tavily would just hit the same quota.
+
+    Ponytail: drop the hardcoded tuple; let the config drive. Any new collector
+    that the user enables in CollectorConfig.enabled automatically participates
+    in the fallback. Per-collector no-op guards (e.g. x_twitter returns [] when
+    no bearer token) keep this safe.
+    """
+    enabled = CollectorConfig().enabled
+    return tuple(c for c in enabled if c != "tavily")
 
 
 def _build_router(settings: HermesSettings) -> LLMRouter:
@@ -108,7 +125,7 @@ async def _gather_sources_fallback(
     out: list[SearchResult] = []
     sources_checked: list[str] = []
     sources_failed: list[str] = []
-    for name in _FALLBACK_COLLECTORS:
+    for name in _resolve_fallback_collectors():
         try:
             items = await run_collector(name, since=since, limit=20, timeout=20)
         except Exception as exc:  # noqa: BLE001
