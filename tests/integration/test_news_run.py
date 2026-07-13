@@ -1,0 +1,106 @@
+"""Integration test for the unified news pipeline orchestrator.
+
+Mocks the LLM router and search provider so the test is offline and fast.
+The orchestrator is the only thing under test; the underlying stages are
+unit-tested in their own files.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
+
+from hermes.config import HermesSettings
+from hermes.pipeline.orchestrator import run_news_pipeline
+from hermes.pipeline.search import SearchResult
+from hermes.pipeline.spec import BriefSpec, SectionSpec
+
+
+SIMPLE_PROMPT = """# Test Report
+
+## Research Instructions
+- Source A
+- Source B
+
+## Report Structure
+## 1. Pulse
+- bullet one
+- bullet two
+
+## 2. Trends
+- bullet one
+"""
+
+
+DEEP_PROMPT = """# Test Deep Report
+
+## Research Instructions
+- Source A
+
+## Report Structure
+## 1. Pulse
+- a
+
+## 2. Trends
+- b
+
+## 3. Frontier
+- c
+
+## 4. Regulation
+- d
+"""
+
+
+def _fake_search_provider(results: list[SearchResult]) -> MagicMock:
+    sp = MagicMock()
+    sp.name = "fake"
+    sp.search = AsyncMock(return_value=results)
+    return sp
+
+
+def _fake_router(text: str = "synthesized prose") -> MagicMock:
+    r = MagicMock()
+    r.stats.total_tokens = 0
+    r.complete = AsyncMock()
+    r.json_complete = AsyncMock(return_value={})
+
+    from hermes.llm.providers.base import ProviderResult
+
+    r.complete.return_value = ProviderResult(
+        text=text, model="test", provider="test", prompt_tokens=10, completion_tokens=20
+    )
+    return r
+
+
+def _make_settings(tmp_path: Path) -> HermesSettings:
+    s = HermesSettings()
+    s.storage.dir = tmp_path
+    return s
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_writes_file_for_simple_prompt(tmp_path):
+    settings = _make_settings(tmp_path)
+    spec = BriefSpec(
+        title="Test Report",
+        sections=[
+            SectionSpec(number=1, title="Pulse", bullets=["a", "b"]),
+            SectionSpec(number=2, title="Trends", bullets=["c"]),
+        ],
+    )
+    search = _fake_search_provider([
+        SearchResult(title="S1", url="https://example.com/1", content="x"),
+    ])
+    router = _fake_router()
+    out = await run_news_pipeline(
+        spec, settings=settings, router=router, search=search,
+        out_path=tmp_path / "out.md",
+    )
+    assert out.exists()
+    text = out.read_text()
+    assert "## **Test Report**" in text
+    assert "## **1. Pulse**" in text
+    assert "## **2. Trends**" in text

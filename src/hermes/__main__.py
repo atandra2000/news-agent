@@ -1,0 +1,8 @@
+"""Application entry point: ``python -m hermes``."""
+
+import sys
+
+from hermes.cli import main
+
+if __name__ == "__main__":
+    sys.exit(main())

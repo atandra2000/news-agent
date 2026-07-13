@@ -1,0 +1,52 @@
+{# research_planner.j2 — Generate report blueprint.
+
+   No prose. Only structured section specifications. #}
+Generate a research plan for today's AI ecosystem report. Return ONLY JSON.
+
+{{ stories_context }}
+
+{% if contradictions_context %}
+{{ contradictions_context }}
+{% endif %}
+
+{% if trend_context %}
+TRENDS: {{ trend_context }}
+{% endif %}
+
+DATE: {{ run_date }}
+
+Create a report blueprint with sections. Each section needs:
+- purpose
+- key narrative
+- supporting claims
+- required statistics
+- required tables
+- required figures
+- required citations
+
+Return JSON:
+{
+  "global_narrative": "overarching story for the report",
+  "sections": [
+    {
+      "title": "section title",
+      "section_type": "executive_summary|analysis|trend|prediction|references|custom",
+      "purpose": "what this section should accomplish",
+      "key_narrative": "the main story to tell",
+      "supporting_claims": ["claim_id1", "claim_id2"],
+      "required_statistics": [{"value": 0.0, "unit": "", "context": ""}],
+      "required_tables": [{"title": "", "description": ""}],
+      "required_figures": [{"title": "", "description": ""}],
+      "required_citations": ["url1", "url2"],
+      "story_ids": ["story_id1"],
+      "word_count_target": 500,
+      "priority": 0.0-1.0
+    }
+  ],
+  "cross_cutting_themes": ["theme1", "theme2"],
+  "contradictions_to_resolve": ["contradiction1"],
+  "noise_to_filter": ["noise1"],
+  "total_word_count_target": 3000
+}
+
+Return ONLY JSON. No prose.

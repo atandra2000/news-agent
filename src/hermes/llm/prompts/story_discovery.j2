@@ -1,0 +1,50 @@
+{# story_discovery.j2 — Discover stories from evidence graph.
+
+   Performs synthesis only. Never writes paragraphs. #}
+Discover stories from this evidence graph. Return ONLY JSON.
+
+{{ graph_context }}
+
+{% if contradictions_context %}
+{{ contradictions_context }}
+{% endif %}
+
+{% if timeline_context %}
+{{ timeline_context }}
+{% endif %}
+
+STATISTICS:
+- Claims: {{ claim_count }}
+- Entities: {{ entity_count }}
+
+Identify:
+1. Major narratives (significant developments)
+2. Minor narratives (smaller trends)
+3. Contradictions (conflicting evidence)
+4. Missing evidence (gaps in coverage)
+5. Emerging trends (new patterns)
+6. Market shifts (competitive changes)
+7. Strategic implications (what this means)
+
+Return JSON:
+{
+  "stories": [
+    {
+      "headline": "what happened + why it matters",
+      "story_type": "paper|model|product|benchmark|event|funding|regulation|community|mixed",
+      "major_narrative": true|false,
+      "supporting_claims": ["claim1", "claim2"],
+      "entities": ["entity1", "entity2"],
+      "contradictions": ["contradiction1"],
+      "missing_evidence": ["gap1"],
+      "emerging_trends": ["trend1"],
+      "market_shifts": ["shift1"],
+      "strategic_implications": ["implication1"],
+      "importance": 0.0-1.0,
+      "novelty": 0.0-1.0,
+      "confidence": 0.0-1.0
+    }
+  ]
+}
+
+Return ONLY JSON. No prose.

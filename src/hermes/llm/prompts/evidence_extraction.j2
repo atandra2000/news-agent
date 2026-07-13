@@ -1,0 +1,34 @@
+{# evidence_extraction.j2 — Extract structured evidence from raw content.
+
+   No summarization. Only extraction. #}
+Extract structured evidence from this content. Return ONLY JSON.
+
+SOURCE: {{ source_type }}
+TITLE: {{ title }}
+URL: {{ url }}
+PUBLISHED: {{ published }}
+
+CONTENT:
+{{ content[:3000] }}
+
+Extract:
+1. entities (companies, models, researchers, products)
+2. claims (factual assertions)
+3. numbers (statistics, benchmarks, metrics)
+4. quotations (direct quotes)
+5. credibility assessment
+6. category classification
+
+Return JSON:
+{
+  "entities": ["entity1", "entity2"],
+  "claims": ["claim1", "claim2"],
+  "numbers": [{"value": 0.0, "unit": "", "context": ""}],
+  "quotations": ["quote1"],
+  "credibility": "high|medium|low|unknown",
+  "confidence": 0.0-1.0,
+  "novelty": 0.0-1.0,
+  "category": "paper|model|product|event|funding"
+}
+
+Return ONLY JSON. No prose.

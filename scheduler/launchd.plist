@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- macOS launchd daily agent. `launchctl load ~/Library/LaunchAgents/com.hermes.daily.plist` -->
+<plist version="1.0">
+  <dict>
+    <key>Label</key>
+    <string>com.hermes.daily</string>
+    <key>ProgramArguments</key>
+    <array>
+      <string>/bin/zsh</string>
+      <string>-lc</string>
+      <string>cd /Users/atandrabharati/Desktop/CoreProjects/hermes &amp;&amp; HERMES_CADENCE=daily .venv/bin/python -m hermes news prompts/ai_news_daily.md &gt;&gt; storage/hermes.log 2&gt;&amp;1</string>
+    </array>
+    <key>StartCalendarInterval</key>
+    <dict>
+      <key>Hour</key>
+      <integer>6</integer>
+      <key>Minute</key>
+      <integer>0</integer>
+    </dict>
+    <key>RunAtLoad</key>
+    <false/>
+    <key>StandardOutPath</key>
+    <string>/Users/atandrabharati/Desktop/CoreProjects/hermes/storage/hermes.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/atandrabharati/Desktop/CoreProjects/hermes/storage/hermes.err.log</string>
+  </dict>
+</plist>

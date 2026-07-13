@@ -1,0 +1,56 @@
+{# section_writer.j2 — Write a single report section from the Story Blueprint.
+
+   Receives ONLY structured blueprint data. No reasoning leakage.
+   Produces polished publication-ready markdown only.
+
+   The system prompt (writer_system.j2) carries all prohibitions. This
+   user prompt is PURE DATA: the section spec plus reference material the
+   Writer converts to prose. It never instructs, commands, or reminds. #}
+Write this report section. Return ONLY markdown.
+
+SECTION: {{ section_title }}
+TYPE: {{ section_type }}
+TARGET: {{ word_count_target }} words
+
+{% if global_narrative %}
+REPORT NARRATIVE: {{ global_narrative }}
+{% endif %}
+
+{% if key_points %}
+POINTS:
+{% for pt in key_points %}
+- {{ pt }}
+{% endfor %}
+{% endif %}
+
+{% if section_context %}
+{{ section_context }}
+{% endif %}
+
+{% if causal_context %}
+{{ causal_context }}
+{% endif %}
+
+{% if synthesis_context %}
+{{ synthesis_context }}
+{% endif %}
+
+{% if tables_context %}
+{{ tables_context }}
+{% endif %}
+
+{% if citations %}
+CITATIONS:
+{% for cit in citations %}
+[{{ loop.index }}] {{ cit.title }} — {{ cit.url }}
+{% endfor %}
+{% endif %}
+
+{% if revision_notes %}
+REVISIONS REQUESTED BY EDITOR:
+{% for note in revision_notes %}
+- {{ note }}
+{% endfor %}
+{% endif %}
+
+Write the section:

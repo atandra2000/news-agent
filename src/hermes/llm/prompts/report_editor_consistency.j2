@@ -1,0 +1,27 @@
+{# report_editor_consistency.j2 — Check cross-section consistency.
+
+   No new facts. Only structural and consistency fixes. #}
+Check these report sections for consistency issues. Return ONLY JSON.
+
+{{ sections_context }}
+
+Check for:
+1. Contradictions between sections
+2. Duplicate information
+3. Inconsistent terminology
+4. Missing cross-references
+5. Timeline inconsistencies
+6. Heading consistency
+
+Return JSON:
+{
+  "fixes": [
+    {
+      "sections": ["section_id1", "section_id2"],
+      "issue": "description of the issue",
+      "suggestion": "how to fix it"
+    }
+  ]
+}
+
+Return ONLY JSON. No prose.

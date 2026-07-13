@@ -1,0 +1,52 @@
+{# chief_analyst_v2.j2 — Chief Analyst reasoning stage.
+
+   Connects sections, removes redundancy, identifies missing research.
+   Never produces report text. #}
+Analyze this research plan. Return ONLY JSON.
+
+{{ plan_context }}
+
+{{ stories_context }}
+
+{% if contradictions_context %}
+{{ contradictions_context }}
+{% endif %}
+
+{% if evidence_gaps_context %}
+{{ evidence_gaps_context }}
+{% endif %}
+
+Analyze:
+1. Section connections (which sections should reference each other)
+2. Redundancy (overlapping content to merge)
+3. Missing research (topics that need more evidence)
+4. Story merging (overlapping stories to combine)
+5. Narrative consistency (ensure one coherent story)
+6. Additional searches needed (if confidence is low)
+
+Return JSON:
+{
+  "section_connections": [
+    {"section_id": "id1", "connected_to": ["id2", "id3"]}
+  ],
+  "redundancy_flags": [
+    {"sections": ["id1", "id2"], "reason": "overlap description", "suggestion": "merge suggestion"}
+  ],
+  "missing_research": [
+    {"topic": "missing topic", "importance": "high|medium|low", "suggestion": "what to research"}
+  ],
+  "merged_stories": [
+    {"story_id_1": "id1", "story_id_2": "id2"}
+  ],
+  "narrative_consistency": {
+    "consistent": true|false,
+    "issues": ["issue1"]
+  },
+  "additional_searches_needed": [
+    {"topic": "search topic", "reason": "why needed"}
+  ],
+  "approved": true|false,
+  "notes": ["note1", "note2"]
+}
+
+Return ONLY JSON. No prose.

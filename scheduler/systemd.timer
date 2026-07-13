@@ -1,0 +1,11 @@
+# /etc/systemd/system/hermes.timer
+[Unit]
+Description=Run Hermes daily at 06:00 local time
+
+[Timer]
+OnCalendar=*-*-* 06:00:00
+Persistent=true
+RandomizedDelaySec=600
+
+[Install]
+WantedBy=timers.target

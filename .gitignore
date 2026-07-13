@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+*.so
+
+# Virtual envs / tool caches
+.venv/
+venv/
+env/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.tox/
+.coverage
+htmlcov/
+.cache/
+
+# Env (never commit secrets)
+.env
+.env.*
+!.env.example
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+*.swp
+*.swo
+*~
+
+# Project-local runtime state
+/storage/                # SQLite db, run manifests, vectors, reports, quality, adapter_state
+/remember/               # internal session memory (now.md, recent.md, archive.md, logs/, tmp/)
+/claude/                 # local Claude Code settings
+/superpowers/            # sdd/ task briefs and plans
+**/.claude
+**/.superpowers
+**/.remember
+
+# Build / packaging
+*.egg
+*.whl
+pip-wheel-metadata/
+storage/

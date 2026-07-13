@@ -1,0 +1,44 @@
+{# claim_extraction.j2 — Extract atomic claims from evidence.
+
+   Each claim is a single, verifiable assertion. #}
+Extract atomic factual claims from this evidence. Return ONLY JSON.
+
+SOURCE: {{ source }}
+CATEGORY: {{ category }}
+
+CONTENT:
+{{ content[:2000] }}
+
+{% if existing_claims %}
+EXISTING CLAIMS:
+{% for claim in existing_claims %}
+- {{ claim }}
+{% endfor %}
+{% endif %}
+
+{% if entities %}
+ENTITIES:
+{% for entity in entities %}
+- {{ entity }}
+{% endfor %}
+{% endif %}
+
+Extract atomic claims. Each claim must be:
+- A single factual assertion
+- Verifiable
+- Specific (name models, numbers, companies)
+
+Return JSON:
+{
+  "claims": [
+    {
+      "statement": "factual assertion",
+      "status": "CORROBORATED|CONFLICTING|SINGLE_SOURCE|UNVERIFIABLE",
+      "confidence": 0.0-1.0,
+      "category": "technical|market|strategic|regulatory",
+      "entities": ["entity1", "entity2"]
+    }
+  ]
+}
+
+Return ONLY JSON. No prose.

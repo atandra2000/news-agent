@@ -1,0 +1,57 @@
+{# editorial_board.j2 — Decide report sections from thesis + stories.
+
+   Consumes the Chief Analyst's review and ACTS on it (merge/cut/re-prioritize).
+   Each section answers an analytical question, not "cover story X".
+   For the brief path, `coverage_contract` is the set of topics that MUST appear
+   somewhere — cover them all, but reorder/group/add a thesis-led opener freely.
+   Structured JSON only; never write paragraphs. #}
+You are the editorial board commissioning an AI-research intelligence report.
+Decide which sections to commission. Return ONLY JSON.
+
+The report must advance this thesis as its spine:
+THESIS SPINE: {{ thesis_spine }}
+{% if thesis_contrarian %}CONTRARIAN ANGLE: {{ thesis_contrarian }}{% endif %}
+{% if thesis_theme %}CROSS-CUTTING THEME: {{ thesis_theme }}{% endif %}
+
+{{ stories_context }}
+
+{% if chief_review_context %}
+CHIEF ANALYST REVIEW (act on this — merge, cut, re-prioritize as flagged):
+{{ chief_review_context }}
+{% endif %}
+
+{% if coverage_contract %}
+COVERAGE CONTRACT — every topic below MUST appear somewhere in the report. You may
+reorder, group several under one section, or add a thesis-led executive summary, but
+no topic may be silently dropped:
+{{ coverage_contract }}
+{% endif %}
+
+Rules:
+1. Each section answers an *analytical question*, not "cover story X".
+2. Merge stories the chief flagged as redundant; cut stories flagged as noise.
+3. Surface contradictions the chief flagged — do not bury them.
+4. Assign depth_tier (front_page | analysis | context) by importance.
+5. Prefer fewer, deeper sections over many shallow ones.
+
+Return JSON:
+{
+  "sections": [
+    {
+      "title": "section title (a claim or question, not a topic label)",
+      "analytical_question": "the question this section answers",
+      "story_ids": ["id1", "id2"],
+      "depth_tier": "front_page|analysis|context",
+      "must_cover": ["brief topic that must appear here"],
+      "word_count_target": 500,
+      "section_type": "executive_summary|analysis|competitive_landscape|historical_comparison|engineering_implications|implications|trend|prediction|references|custom"
+    }
+  ],
+  "front_page": ["story_id", "..."],
+  "merged_stories": [["story_id_1", "story_id_2"]],
+  "cut_stories": ["story_id"],
+  "contradictions_to_surface": ["contradiction description"],
+  "global_narrative": "one-sentence thread connecting the sections to the thesis"
+}
+
+Return ONLY JSON. No prose.

@@ -1,0 +1,17 @@
+# Linux systemd daily timer for Hermes.
+# Install: copy both files to /etc/systemd/system/, then:
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now hermes.timer
+
+# /etc/systemd/system/hermes.service
+[Unit]
+Description=Hermes autonomous AI research report
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/hermes
+ExecStart=/opt/hermes/.venv/bin/python -m hermes news /opt/hermes/prompts/ai_news_daily.md
+Environment=HERMES_CADENCE=daily
+User=hermes

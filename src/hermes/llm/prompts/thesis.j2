@@ -1,0 +1,37 @@
+{# thesis.j2 — Form the report's overarching argument BEFORE any prose.
+
+   This is the spine of the report. Structured JSON only; never write paragraphs.
+   Constraints (brief path) shape the angle; daily path leaves them empty. #}
+Form the overarching thesis for an AI-research intelligence report. Return ONLY JSON.
+
+You are the senior analyst who decides the *argument* of the report — the single
+mental model a reader should carry away. Do NOT plan sections, do NOT write prose,
+do NOT list what happened. Decide what it MEANS.
+
+{% if constraints_context %}
+EDITORIAL CONSTRAINTS (shape the angle, do not copy them):
+{{ constraints_context }}
+{% endif %}
+
+{{ stories_context }}
+
+{% if graph_context %}
+{{ graph_context }}
+{% endif %}
+
+Produce ONE overarching thesis plus its supporting pillars and the contrarian angle
+(the against-the-consensus take — this is where original insight comes from; if the
+evidence genuinely supports consensus, say so plainly rather than forcing a hot take).
+
+Return JSON:
+{
+  "spine": "the overarching argument / the question this report answers in one or two sentences",
+  "supporting_theses": [
+    {"statement": "a pillar that underpins the spine", "story_ids": ["id1"], "evidence_ids": ["id1"]}
+  ],
+  "contrarian_take": "the against-the-consensus angle, or 'evidence supports consensus' if it does",
+  "cross_cutting_theme": "the thread uniting otherwise-disparate stories",
+  "confidence": 0.0-1.0
+}
+
+Return ONLY JSON. No prose.
