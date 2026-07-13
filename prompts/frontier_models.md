@@ -1,7 +1,7 @@
 # FRONTIER AI MODELS — FOCUSED BRIEF#
 
 Autonomous focused brief on frontier model releases and capability shifts.
-Best run weekly or monthly for a deep, comparison-first report.
+Best run weekly for a deep, comparison-first report.
 
 # Research Instructions#
 

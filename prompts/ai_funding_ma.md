@@ -1,7 +1,7 @@
 # AI FUNDING, M&A & BUSINESS BRIEF#
 
 Autonomous brief on the money moving through AI: raises, acquisitions,
-IPOs, and strategic consolidation. Best run weekly or monthly.
+IPOs, and strategic consolidation. Best run weekly.
 
 # Research Instructions#
 

@@ -1,15 +1,16 @@
-# AI STATE OF THE INDUSTRY — MONTHLY
+# AI NEWS — MONTHLY RETROSPECTIVE#
 
-Autonomous monthly AI-industry brief. Reads like a hybrid of the Stanford
-AI Index, the State of AI Report, and top-tier equity research. Synthesize
-the past 30 days into one coherent, deeply researched report.
+Autonomous monthly retrospective. Synthesizes the past 30 days into a
+narrative: what happened, why it mattered, how it changed the industry,
+and what comes next. Reads like a hybrid of the Stanford AI Index and
+top-tier equity research.
 
 # Research Instructions
 
-Synthesize hundreds of signals into a single narrative: what happened, why
-it mattered, how it changed the industry, and what comes next. For every
+Synthesize hundreds of signals into a single retrospective. For every
 factual claim, cite the exact source URL with the token [src:URL] right
-after the claim.
+after the claim. Prefer primary sources; corroborate important claims
+using multiple reputable sources.
 
 ## Official Sources
 - OpenAI
@@ -30,7 +31,6 @@ after the claim.
 - DeepSeek
 - Alibaba Qwen
 - Moonshot AI
-- MiniMax
 - Zhipu AI
 - Perplexity
 - Groq
@@ -74,75 +74,58 @@ skepticism, and hidden trends. Never treat community opinion as fact.
 # Report Structure
 
 ## 1. Executive Summary
-- biggest breakthroughs
+- biggest breakthroughs of the month
 - biggest disappointments
-- largest shifts
-- defining themes
+- largest industry shifts
 - comparison with the prior month
 
 ## 2. Month Timeline
-- major model releases
-- research breakthroughs
-- funding and acquisitions
-- product launches
-- regulation and hardware
+- major model releases, research breakthroughs, and product launches
+- funding, acquisitions, and regulation milestones
 - explain why each mattered
 
-## 3. Frontier Models
-- release date, developer, architecture
-- context, reasoning, coding, pricing
-- strengths, weaknesses, innovations
-- compare against competitors
+## 3. Frontier & Infrastructure
+- model releases: architecture, context, reasoning, coding, pricing
+- chips, systems, serving frameworks, and supply signals
+- render model and silicon moves as comparison tables
 
 ## 4. Research Breakthroughs
-- reasoning, inference scaling, MoE, memory
-- long-context, RAG, synthetic data, RL
-- alignment, interpretability, efficient training
+- reasoning, inference scaling, MoE, memory, long-context
+- RAG, synthetic data, RL, alignment, interpretability
+- efficient training methods
 - for each: problem, method, innovation, impact
 
-## 5. AI Agents & Coding
-- coding agents, research agents, enterprise agents
-- MCP/A2A, memory, orchestration, evaluation
+## 5. AI Agents & Open Source
+- coding agents, agent platforms, MCP/A2A ecosystem
+- open-weight releases and ecosystem traction
 - compare leading platforms
 
-## 6. Open Source AI
-- Llama, DeepSeek, Qwen, Gemma, Mistral, Phi
-- licenses, ecosystem, benchmarks, adoption
-
-## 7. Hardware & Infrastructure
-- NVIDIA, AMD, Intel, TPU, Groq, Cerebras
-- HBM, networking, pricing, availability
-
-## 8. Funding, M&A & Business
+## 6. Funding, M&A & Business
 - largest investments and acquisitions
 - new unicorns, IPOs, market consolidation
+- render as a funding comparison table
 
-## 9. Regulation & Policy
+## 7. Regulation & Policy
 - United States, EU, UK, China, India
 - AI safety, copyright, privacy, open-source policy
 
-## 10. Enterprise & Industry Adoption
+## 8. Enterprise & Industry Adoption
 - healthcare, finance, legal, defense, software engineering
 - measurable productivity where available
 
-## 11. Community & Ecosystem
-- developer sentiment, favorite tools, criticisms
-- production lessons, emerging workflows
-
-## 12. Benchmarks & Capability
+## 9. Benchmarks & Capability
 - GPQA, AIME, SWE-Bench, MMLU, MMMU
 - discuss limitations and overfitting
 
-## 13. Predictions
+## 10. Predictions & Watchlist
 - next models, research directions, hardware
 - agent evolution, regulatory outlook
 - clearly labeled as informed predictions
 
 # Required Deliverables
 - Executive summary
-- Full analytical report
 - Month timeline
-- Model comparison matrix
+- Model and silicon comparison tables
 - Funding tables
 - Benchmark comparison tables
 - Key statistics

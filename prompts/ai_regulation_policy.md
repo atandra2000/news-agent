@@ -1,7 +1,7 @@
 # AI REGULATION & POLICY TRACKER#
 
 Autonomous brief on AI governance, law, and policy across jurisdictions.
-Best run weekly or monthly to track an evolving, fragmented landscape.
+Best run weekly to track an evolving, fragmented landscape.
 
 # Research Instructions#
 

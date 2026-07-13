@@ -1,7 +1,7 @@
 # AI AGENTS & CODING TOOLS BRIEF#
 
 Autonomous brief on coding agents, agent platforms, and the
-agentic-software toolchain. Best run weekly or monthly.
+agentic-software toolchain. Best run weekly.
 
 # Research Instructions#
 

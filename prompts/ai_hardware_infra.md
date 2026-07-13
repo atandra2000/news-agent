@@ -1,7 +1,7 @@
 # AI HARDWARE & INFRASTRUCTURE BRIEF#
 
 Autonomous brief on the compute layer behind AI: chips, systems, cloud,
-and serving infrastructure. Best run weekly or monthly.
+and serving infrastructure. Best run weekly.
 
 # Research Instructions#
 
