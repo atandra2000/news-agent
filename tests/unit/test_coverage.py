@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from hermes.pipeline.coverage import (
     _category_for,
+    _category_for_explicit,
     _section_required_category,
     evaluate_coverage,
 )
@@ -125,3 +126,33 @@ def test_evaluate_coverage_realistic_monthly():
     assert by_num[6] in ("OK", "THIN")
     # Universal sections are OK.
     assert by_num[1] == "OK"
+
+
+# ── Per-feed category stamp (Task 1) ─────────────────────────────────────────
+# The RSS collector now stamps each item's category from the feed URL via
+# _FEED_CATEGORY. Coverage logic consults that stamp first so a feed from
+# openai.com counts as 'official' even though its SearchResult.source is 'rss'
+# (kept for back-compat with the legacy news bucket). The stamp is what
+# unblocks the 2026-07-14 monthly report's "Frontier Models" verdict: items
+# from OpenAI/Anthropic/DeepMind lab feeds now resolve to 'official'.
+
+
+def test_category_for_uses_explicit_stamp():
+    """Stamp wins over legacy source-based categorization."""
+    s = SearchResult(
+        title="t", url="https://x", source="rss",
+        extra={"category": "official"},
+    )
+    assert _category_for_explicit(s) == "official"
+
+
+def test_category_for_falls_back_to_source():
+    """No stamp → fall back to legacy _category_for(source)."""
+    s = SearchResult(title="t", url="https://x", source="arxiv")
+    assert _category_for_explicit(s) == "research"
+
+
+def test_category_for_legacy_rss_defaults_to_news():
+    """An RSS item without a stamp (older corpus, pre-fix) still maps to 'news'."""
+    s = SearchResult(title="t", url="https://x", source="rss")  # no extra
+    assert _category_for_explicit(s) == "news"

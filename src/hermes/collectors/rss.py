@@ -79,6 +79,82 @@ DEFAULT_FEEDS = [
     "https://www.aiweekly.co/rss.xml",
 ]
 
+# Per-feed category. Lab blogs are "official" (primary sources), Substacks and
+# personal blogs are "community" (analysis/sentiment), news outlets are "news",
+# hardware-vendor blogs are "research" (since they publish benchmarks + tech
+# reports). Unmapped URLs default to "news" (the legacy behavior of bucketing
+# all RSS as news).
+#
+# Ponytail: a dict literal beats a regex against the URL — one place to read,
+# no second file to keep in sync, the maintenance cost of a new feed is
+# "add it to two dicts" not "parse and debug a heuristic".
+_FEED_CATEGORY: dict[str, str] = {
+    # --- Official lab / vendor blogs (primary sources) ---
+    "https://openai.com/news/rss.xml": "official",
+    "https://deepmind.google/blog/rss.xml": "official",
+    "https://blog.google/technology/ai/rss/": "official",
+    "https://www.microsoft.com/en-us/research/feed/": "official",
+    "https://research.facebook.com/feed/": "official",
+    "https://huggingface.co/blog/feed.xml": "official",
+    "https://bair.berkeley.edu/blog/feed.xml": "official",
+    "https://ai.meta.com/blog/rss/": "official",
+    "https://www.anthropic.com/news/rss.xml": "official",
+    "https://developer.nvidia.com/blog/feed/": "research",
+    "https://rocm.blogs.amd.com/feed": "research",
+    "https://aws.amazon.com/blogs/machine-learning/feed/": "research",
+    # --- News outlets (paid press / trade press) ---
+    "https://www.theinformation.com/feed": "news",
+    "https://www.technologyreview.com/feed/": "news",
+    "https://venturebeat.com/category/ai/feed/": "news",
+    "https://techcrunch.com/category/artificial-intelligence/feed/": "news",
+    "https://www.theverge.com/ai-artificial-intelligence/rss/index.xml": "news",
+    "https://arstechnica.com/ai/feed/": "news",
+    "https://www.wired.com/feed/tag/ai/latest/rss": "news",
+    "https://www.theregister.com/headlines.atom": "news",
+    "https://www.zdnet.com/topic/artificial-intelligence/rss.xml": "news",
+    "https://siliconangle.com/category/ai/feed/": "news",
+    "https://thenextweb.com/section/ai/feed/": "news",
+    "https://www.engadget.com/tag/ai/rss.xml": "news",
+    "https://www.thurrott.com/ai/feed": "news",
+    "https://hpcwire.com/feed/": "news",
+    "https://www.tomshardware.com/feeds/tag/ai/latest": "news",
+    "https://www.anandtech.com/feed": "news",
+    # --- Policy / regulation (the brief lists EU + US + China + India) ---
+    "https://www.europarl.europa.eu/rss/documents/topics/AI.xml": "news",
+    "https://www.whitehouse.gov/feed/": "news",
+    "https://digital-strategy.ec.europa.eu/en/rss.xml": "news",
+    # --- Aggregators / Substacks / personal blogs (community) ---
+    "https://simonwillison.net/atom/everything/": "community",
+    "https://lilianweng.github.io/index.xml": "community",
+    "https://distill.pub/rss.xml": "community",
+    "https://thegradient.pub/rss/": "community",
+    "https://magazine.sebastianraschka.com/feed": "community",
+    "https://www.interconnects.ai/feed": "community",
+    "https://aiguide.substack.com/feed": "community",
+    "https://www.marktechpost.com/feed/": "community",
+    "https://machinelearningmastery.com/feed/": "community",
+    "https://nlp.elvissaravia.com/feed": "community",
+    "https://blog.einstein.ai/feed": "community",
+    "https://stratechery.com/feed/": "community",
+    "https://importai.substack.com/feed": "community",
+    "https://www.latent.space/feed": "community",
+    "https://www.deeplearning.ai/the-batch/feed/": "community",
+    "https://bensbites.substack.com/feed": "community",
+    "https://alphasignal.substack.com/feed": "community",
+    "https://thezvi.substack.com/feed": "community",
+    "https://www.oneusefulthing.substack.com/feed": "community",
+    "https://www.aisnakeoil.com/feed": "community",
+    "https://thealgorithmicbridge.substack.com/feed": "community",
+    "https://www.therundown.ai/feed": "community",
+    "https://www.superhuman.ai/feed": "community",
+    "https://www.aiweekly.co/rss.xml": "community",
+}
+
+
+def _category_for_feed(feed_url: str) -> str:
+    """Look up the category for a feed URL. Default to 'news' (legacy)."""
+    return _FEED_CATEGORY.get(feed_url, "news")
+
 ATOM = "{http://www.w3.org/2005/Atom}"
 
 
@@ -122,6 +198,7 @@ class RSSCollector(CollectorAdapter):
 
     def _parse(self, root: ET.Element, feed: str, cutoff: float) -> list[RawItem]:
         out: list[RawItem] = []
+        feed_category = _category_for_feed(feed)
         # RSS 2.0
         channel = root.find("channel")
         if channel is not None:
@@ -142,7 +219,7 @@ class RSSCollector(CollectorAdapter):
                         content=_strip_html(desc)[:2000],
                         author=item.findtext("author"),
                         published_at=pub,
-                        extra={"feed": feed},
+                        extra={"feed": feed, "category": feed_category},
                     )
                 )
             return out
@@ -167,7 +244,7 @@ class RSSCollector(CollectorAdapter):
                     url=url,
                     content=_strip_html(summary)[:2000],
                     published_at=pub,
-                    extra={"feed": feed},
+                    extra={"feed": feed, "category": feed_category},
                 )
             )
         return out

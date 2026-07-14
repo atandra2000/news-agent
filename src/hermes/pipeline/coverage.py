@@ -59,6 +59,21 @@ def _category_for(source: str) -> str:
     return "community"  # conservative default — most "other" is community
 
 
+def _category_for_explicit(s: "SearchResult") -> str:
+    """Consult the explicit per-item category stamp (set by the RSS collector's
+    per-feed map) first; fall back to the legacy source-type → category map.
+
+    The stamp is what we want: a feed from openai.com is ``official`` regardless
+    of how the search backend names the source. Falls back to ``_category_for``
+    for sources that don't stamp a category (GitHub, arXiv, HN, etc.).
+    """
+    extra = getattr(s, "extra", None) or {}
+    cat = extra.get("category")
+    if cat:
+        return cat
+    return _category_for(s.source)
+
+
 # Section titles that map strongly to one category. When a section's title
 # matches a known category, coverage in that category is REQUIRED; coverage
 # in other categories is optional.
@@ -134,7 +149,7 @@ def evaluate_coverage(
     cats: dict[str, int] = {}
     total = 0
     for s in sources:
-        c = _category_for(s.source)
+        c = _category_for_explicit(s)
         cats[c] = cats.get(c, 0) + 1
         total += 1
 

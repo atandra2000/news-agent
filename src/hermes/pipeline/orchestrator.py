@@ -143,6 +143,7 @@ async def _gather_sources_fallback(
                     content=(it.content or it.summary or "")[:600],
                     published_date=it.published_at.isoformat() if it.published_at else None,
                     source=it.source_type,
+                    extra=dict(getattr(it, "extra", None) or {}),
                 )
             )
         if len(out) >= max_sources * 2:
