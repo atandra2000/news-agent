@@ -45,6 +45,20 @@ def test_section_required_category_matches_title():
     assert _section_required_category(SectionSpec(6, "Month Timeline")) is None
 
 
+def test_section_required_category_recognizes_frontier_infrastructure():
+    """The 2026-07-13 monthly report's §3 'Frontier & Infrastructure' must map to
+    'official' so the per-category 3.0 boost in `_score_source` actually fires
+    on monthly briefs. Pre-fix: returned None → boost was a no-op on the brief
+    that motivated the change."""
+    assert _section_required_category(
+        SectionSpec(3, "Frontier & Infrastructure")
+    ) == "official"
+    # Also covers the "Hardware & Infrastructure" variant for any future prompt.
+    assert _section_required_category(
+        SectionSpec(5, "Hardware & Infrastructure")
+    ) == "official"
+
+
 def test_evaluate_coverage_ok_when_category_satisfied():
     """≥5 official sources → OK for the Frontier Models section."""
     spec = BriefSpec(

@@ -51,7 +51,7 @@ def _recency_bonus(s: SearchResult, recency_days: int | None) -> int:
         return 0
 
 
-def _score_source(kws: set[str], s: SearchResult, recency_days: int | None, *, section: SectionSpec | None = None) -> int:
+def _score_source(kws: set[str], s: SearchResult, recency_days: int | None, *, section: SectionSpec | None = None) -> float:
     title = (s.title or "").lower()
     body = f"{s.title} {s.content}".lower()
     score = 0

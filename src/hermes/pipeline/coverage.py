@@ -82,6 +82,7 @@ _SECTION_CATEGORY_HINTS: dict[str, str] = {
     "frontier model": "official",
     "model": "official",
     "hardware": "official",
+    "infrastructure": "official",  # monthly §3 "Frontier & Infrastructure" + "Hardware & Infrastructure"
     "open source": "research",
     "agent": "community",
     "agent & coding": "community",
