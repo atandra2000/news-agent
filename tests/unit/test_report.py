@@ -660,3 +660,73 @@ def test_build_section_prompt_forbids_cot_and_stubs():
     assert "do not repeat information" in lowered
     assert "do not invent model names" in lowered
     assert "src:url" in lowered
+
+
+class TestCoverageSummary:
+    """The orchestrator computes per-section coverage verdicts (OK / THIN /
+    CRITICAL) and logs them as ``coverage_verdicts critical=N ok=N thin=N``,
+    but the rendered report footer did not surface them — readers could not
+    tell which sections were healthy and which were CRITICAL without re-running.
+
+    The footer table is built by ``format_coverage_summary`` from a list of
+    ``(title, verdict)`` tuples and appended to the assembled report text.
+    Empty input returns empty string (no banner when no verdicts are known).
+    """
+
+    def test_coverage_summary_renders_per_section_verdict(self):
+        from hermes.pipeline.report import format_coverage_summary
+
+        verdicts = [
+            ("Executive Summary", "OK"),
+            ("Funding, M&A & Business", "CRITICAL"),
+            ("Benchmarks & Capability", "OK"),
+        ]
+        out = format_coverage_summary(verdicts)
+        # Markdown table: heading + header row + one row per section.
+        assert "## Coverage Verdicts" in out
+        assert "| Section | Verdict |" in out
+        # Each (title, verdict) pair renders as a row in the table.
+        assert "| Executive Summary | OK |" in out
+        assert "| Funding, M&A & Business | CRITICAL |" in out
+        assert "| Benchmarks & Capability | OK |" in out
+
+    def test_coverage_summary_empty_returns_empty(self):
+        from hermes.pipeline.report import format_coverage_summary
+
+        assert format_coverage_summary([]) == ""
+
+    def test_assemble_appends_coverage_verdict_footer(self):
+        # End-to-end: assemble_report should append the coverage verdict table
+        # to the report text when verdicts are supplied. The footer appears
+        # AFTER the body and AFTER the references block (so it serves as a
+        # visible "what you just read was supported by" callout).
+        from hermes.pipeline.coverage import CoverageVerdict
+        from hermes.pipeline.report import assemble_report
+        from hermes.pipeline.spec import BriefSpec, SectionSpec
+
+        spec = BriefSpec(
+            title="T",
+            sections=[
+                SectionSpec(number=1, title="Executive Summary"),
+                SectionSpec(number=2, title="Funding, M&A & Business"),
+            ],
+        )
+        sources = [SearchResult(title="src", url="https://x/1", source="ex.com")]
+        verdicts = [
+            CoverageVerdict(
+                section_number=1, section_title="Executive Summary",
+                verdict="OK", sources_in_section=5,
+                categories_present=("official",), required_category=None,
+            ),
+            CoverageVerdict(
+                section_number=2, section_title="Funding, M&A & Business",
+                verdict="CRITICAL", sources_in_section=0,
+                categories_present=("official",), required_category="news",
+            ),
+        ]
+        sections = ["## **1. Executive Summary**\nBody. [src:https://x/1]", "## **2. Funding, M&A & Business**\nBody."]
+        rep = assemble_report(spec, sections, sources, verdicts=verdicts)
+        # Footer present, with the section titles and verdicts.
+        assert "## Coverage Verdicts" in rep.text
+        assert "| Executive Summary | OK |" in rep.text
+        assert "| Funding, M&A & Business | CRITICAL |" in rep.text

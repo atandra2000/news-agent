@@ -240,6 +240,28 @@ def thin_corpus_banner(
     return ""
 
 
+def format_coverage_summary(verdicts: list[tuple[str, str]]) -> str:
+    """Render a one-line-per-section coverage table for the report footer.
+
+    The orchestrator already computes per-section OK/THIN/CRITICAL verdicts
+    and logs them as ``coverage_verdicts critical=N ok=N thin=N``. The 2026-07-13
+    monthly report shipped without surfacing those verdicts in the rendered
+    text — readers could not tell which sections were healthy and which were
+    CRITICAL without re-running. This footer makes the verdict visible at the
+    end of the report so the corpus quality is transparent at a glance.
+
+    Returns "" when no verdicts are supplied (silent no-op).
+    """
+    if not verdicts:
+        return ""
+    lines = ["## Coverage Verdicts (per section)", ""]
+    lines.append("| Section | Verdict |")
+    lines.append("|---|---|")
+    for title, verdict in verdicts:
+        lines.append(f"| {title} | {verdict} |")
+    return "\n".join(lines) + "\n"
+
+
 def _strip_label_brackets(body: str) -> str:
     """Remove non-URL citation fig-leaves before citation resolution."""
     return _LABEL_BRACKET_RE.sub("", body)
@@ -383,6 +405,16 @@ def assemble_report(
             full = full.replace(title_line, f"{title_line}\n\n{banner}", 1)
         else:
             full = banner + "\n" + full
+
+    # Per-section coverage verdict table (Task 7). The orchestrator computes
+    # OK/THIN/CRITICAL per section and passes them via ``verdicts``; we render
+    # them as a small markdown table appended to the report so readers can see
+    # corpus quality at a glance without re-running.
+    if verdicts:
+        verdict_pairs = [(v.section_title, v.verdict) for v in verdicts]
+        coverage_footer = format_coverage_summary(verdict_pairs)
+        if coverage_footer:
+            full = full.rstrip() + "\n\n" + coverage_footer
 
     return AssembledReport(
         title=spec.title,
