@@ -293,3 +293,127 @@ Structure:
     assert "**4. Research Breakthroughs**" not in out
     # Real heading is preserved:
     assert out.startswith("## **3. Frontier & Infrastructure**")
+
+
+# ── section-rewrite gate: pin the floor so 0.25/0.35 can never ship ──────────
+# 2026-07-13 monthly brief: Research & Breakthroughs shipped with score=0.35
+# and Benchmarks shipped with score=0.25 because the loop returned the
+# final text unconditionally after exhausting rewrites.
+
+
+def test_section_rewrite_budget_defaults():
+    from hermes.pipeline.synthesize import SectionRewriteBudget
+
+    b = SectionRewriteBudget()
+    assert b.min_score == 0.5
+    assert b.max_iterations == 2
+
+
+def test_section_rewrite_budget_explicit_values():
+    from hermes.pipeline.synthesize import SectionRewriteBudget
+
+    b = SectionRewriteBudget(min_score=0.6, max_iterations=3)
+    assert b == SectionRewriteBudget(min_score=0.6, max_iterations=3)
+
+
+async def test_section_rewrite_loop_placeholder_when_below_floor(monkeypatch):
+    """The 2026-07-13 bug: a section whose final critic score is 0.25 must NOT
+    be shipped. The loop must substitute the existing _placeholder(section)
+    after exhausting its iteration budget.
+    """
+    from hermes.pipeline import synthesize as synth
+    from hermes.pipeline.synthesize import (
+        SectionRewriteBudget,
+        synthesize_section_with_review,
+    )
+    from tests.helpers import FakeRouter
+
+    section = SectionSpec(number=6, title="Benchmarks & Capability Moves", bullets=["MMLU", "GPQA"])
+
+    # Force the writer to always emit a real-looking (but critic-rejected) draft.
+    real_text = (
+        "## **6. Benchmarks & Capability Moves**\n\n"
+        "July saw MMLU climb to 92% [src:https://example.com/b]."
+    )
+
+    async def fake_synthesize(*_args, **_kwargs):
+        return real_text
+
+    # Critic verdict: score=0.25, 8 gaps, citations missing. Mirrors the bad log.
+    bad_verdict = {
+        "pass": False,
+        "score": 0.25,
+        "gaps": ["g"] * 8,
+        "missing_citations": True,
+        "cadence_ok": True,
+        "has_cot_or_stub": False,
+        "feedback": "rewrite harder",
+    }
+
+    async def fake_critique(*_args, **_kwargs):
+        return bad_verdict
+
+    monkeypatch.setattr(synth, "synthesize_section", fake_synthesize)
+    monkeypatch.setattr(synth, "critique_section", fake_critique)
+
+    budget = SectionRewriteBudget(min_score=0.5, max_iterations=2)
+    out = await synthesize_section_with_review(
+        section, [], router=FakeRouter(),
+        rewrite_threshold=0.75,
+        min_score=budget.min_score,
+        max_iterations=budget.max_iterations,
+    )
+
+    # The score-0.25 draft must NOT be the shipped text.
+    assert "MMLU climb to 92%" not in out
+    # The placeholder from synthesize.py must be the returned text.
+    assert out.startswith("## **6. Benchmarks & Capability Moves**")
+    assert "No LLM available to synthesize this section" in out
+
+
+async def test_section_rewrite_loop_passes_above_floor(monkeypatch):
+    """A section whose final score meets the floor must ship the real prose."""
+    from hermes.pipeline import synthesize as synth
+    from hermes.pipeline.synthesize import (
+        SectionRewriteBudget,
+        synthesize_section_with_review,
+    )
+    from tests.helpers import FakeRouter
+
+    section = SectionSpec(number=1, title="Executive Summary", bullets=["frontier models"])
+
+    real_text = (
+        "## **1. Executive Summary**\n\n"
+        "Frontier models advanced significantly this month [src:https://example.com/a]."
+    )
+
+    async def fake_synthesize(*_args, **_kwargs):
+        return real_text
+
+    good_verdict = {
+        "pass": True,
+        "score": 0.85,
+        "gaps": [],
+        "missing_citations": False,
+        "cadence_ok": True,
+        "has_cot_or_stub": False,
+        "feedback": "",
+    }
+
+    async def fake_critique(*_args, **_kwargs):
+        return good_verdict
+
+    monkeypatch.setattr(synth, "synthesize_section", fake_synthesize)
+    monkeypatch.setattr(synth, "critique_section", fake_critique)
+
+    budget = SectionRewriteBudget(min_score=0.5, max_iterations=2)
+    out = await synthesize_section_with_review(
+        section, [], router=FakeRouter(),
+        rewrite_threshold=0.75,
+        min_score=budget.min_score,
+        max_iterations=budget.max_iterations,
+    )
+
+    # Real prose ships when critic accepts.
+    assert "Frontier models advanced significantly" in out
+    assert "No LLM available" not in out

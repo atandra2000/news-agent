@@ -175,6 +175,19 @@ class RAGConfig(BaseSettings):
     max_context_chars: int = 2000
 
 
+class ReportConfig(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="HERMES_REPORT_", env_file=".env", extra="ignore")
+
+    # Critic score floor: after the rewrite loop exhausts ``max_rewrite_iterations``,
+    # a section whose final score is below this threshold is replaced with the
+    # standard _placeholder(section) instead of being shipped. Pin defaults
+    # match ``SectionRewriteBudget`` in pipeline/synthesize.py.
+    min_section_score: float = 0.5
+    # Hard cap on the number of critic→rewrite iterations. 2 is enough to
+    # let one full rewrite happen after the initial draft fails the floor.
+    max_rewrite_iterations: int = 2
+
+
 class HermesSettings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="HERMES_",
@@ -198,6 +211,7 @@ class HermesSettings(BaseSettings):
     storage: StorageConfig = StorageConfig()
     search: SearchConfig = SearchConfig()
     rag: RAGConfig = RAGConfig()
+    report: ReportConfig = ReportConfig()
 
     @property
     def sqlite_url(self) -> str:

@@ -213,6 +213,8 @@ async def _synthesize_section_parallel(
             quality=spec.quality, deliverables=spec.deliverables,
             date_label=date_label, cadence_note=cadence_note,
             rag_context=rag_context, max_tokens=max_tokens,
+            min_score=settings.report.min_section_score,
+            max_iterations=settings.report.max_rewrite_iterations,
         )
 
         # Research loop: extra queries if citations are thin.
@@ -228,6 +230,8 @@ async def _synthesize_section_parallel(
                     quality=spec.quality, deliverables=spec.deliverables,
                     date_label=date_label, cadence_note=cadence_note,
                     rag_context=rag_context, max_tokens=max_tokens,
+                    min_score=settings.report.min_section_score,
+                    max_iterations=settings.report.max_rewrite_iterations,
                 )
 
         # CoT backstop + sanitizer.

@@ -140,8 +140,11 @@ For each `SectionSpec` in parallel (bounded by an `asyncio.Semaphore`):
    clean dropped-section marker.
 5. **Critic** — `critique_section` evaluates the section against the
    quality bar + cadence + citation density. On rejection, the section
-   is rewritten with the critic's feedback appended (up to `max_rewrites`,
-   default 2).
+   is rewritten with the critic's feedback appended (up to
+   `max_iterations`, default 2). After the budget is exhausted, a
+   post-loop gate enforces `min_section_score` (default 0.5): a
+   section whose final score falls below the floor is replaced with
+   the standard `_placeholder(section)`.
 6. **Validity gate** — `clean_section_text` rejects sections that fail
    structural checks (no heading, all-CoT, residual markers); the
    synthesizer retries, then placeholders.
@@ -211,10 +214,15 @@ This is the only critic loop — there is no separate post-render pass.
 2. `critique_section()` reviews the output and either approves it or returns
    `rewrite_instructions` + a `score` + `gaps` + `missing_citations`.
 3. On rejection, the synthesizer is called again with the critic's
-   instructions appended to the prompt (up to `max_rewrites`). This lets the
-   loop actually improve a rejected section instead of regenerating identical
-   text.
-4. If all retries fail, the last accepted output is kept.
+   instructions appended to the prompt (up to `max_iterations`,
+   default 2; configured by `HERMES_REPORT_MAX_REWRITE_ITERATIONS`).
+   This lets the loop actually improve a rejected section instead of
+   regenerating identical text.
+4. If the loop exhausts its budget and the final critic score is still
+   below `min_section_score` (default 0.5, configured by
+   `HERMES_REPORT_MIN_SECTION_SCORE`), the section is replaced with the
+   standard `_placeholder(section)` and logged as
+   `brief.section_below_floor`. A sub-threshold draft can no longer ship.
 
 (The legacy `_self_critique` post-render pass and the separate
 `critique_report()` whole-report critic are gone — criticism is

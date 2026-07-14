@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from datetime import date, datetime
 
 from hermes.pipeline.planner import section_keywords
@@ -12,6 +13,21 @@ from hermes.llm.router import LLMRouter
 from hermes.logging import get_logger
 
 log = get_logger("brief.synthesize")
+
+
+@dataclass(frozen=True)
+class SectionRewriteBudget:
+    """Gate the critic loop's final ship decision.
+
+    After the loop exhausts ``max_iterations`` rewrites, the section is only
+    shipped if its final ``critic.score`` is at or above ``min_score``;
+    otherwise the section is replaced with the standard ``_placeholder(section)``
+    and marked as failed. Without this gate the loop used to ship drafts
+    with scores as low as 0.25 (see 2026-07-13 monthly brief).
+    """
+
+    min_score: float = 0.5
+    max_iterations: int = 2
 
 _STOP = {
     "the", "and", "for", "with", "that", "this", "from", "into", "your", "have",
@@ -670,11 +686,18 @@ async def synthesize_section_with_review(
     cadence_note: str = "",
     rag_context: str = "",
     rewrite_threshold: float = 0.75,
-    max_rewrites: int = 2,
+    min_score: float = 0.5,
+    max_iterations: int = 2,
     max_tokens: int = 5000,
 ) -> str:
     """Synthesize a section, then critique and optionally rewrite (bounded to
-    ``max_rewrites`` iterations; only rewrites if the critic flags issues).
+    ``max_iterations`` iterations; only rewrites if the critic flags issues).
+
+    After the rewrite budget is exhausted, the section is only shipped if the
+    final ``critic.score`` is at or above ``min_score``; otherwise the section
+    is replaced with the standard ``_placeholder(section)`` and the section is
+    marked as failed. This gate fixes the 2026-07-13 bug where drafts with
+    scores as low as 0.25 were shipped.
     """
     quality = quality or []
     deliverables = deliverables or []
@@ -694,7 +717,9 @@ async def synthesize_section_with_review(
     if text.startswith("## **") and "No LLM available" in text:
         return text  # Placeholder — skip critic
 
-    for iteration in range(max_rewrites + 1):
+    # Track the final critic score so the post-loop min_score gate can see it.
+    final_score: float | None = None
+    for iteration in range(max_iterations + 1):
         verdict = await critique_section(
             text,
             section,
@@ -709,6 +734,7 @@ async def synthesize_section_with_review(
         missing_citations = verdict.get("missing_citations", False)
         has_cot_or_stub = verdict.get("has_cot_or_stub", False)
         feedback = verdict.get("feedback", "")
+        final_score = score
 
         if score >= rewrite_threshold and not gaps and not missing_citations and not has_cot_or_stub:
             log.info(
@@ -720,7 +746,7 @@ async def synthesize_section_with_review(
             )
             return text
 
-        if iteration < max_rewrites:
+        if iteration < max_iterations:
             log.info(
                 "brief.section_rewrite",
                 section=section.number,
@@ -748,8 +774,22 @@ CRITIC FEEDBACK (address these in your rewrite):
 REWRITE THE SECTION NOW, addressing the gaps while maintaining the same structure and citation format."""
             res = await router.complete("brief_write", rewrite_prompt, temperature=0.3, max_tokens=max_tokens)
             if res.provider == "heuristic" or not res.text.strip():
-                return text  # Keep the original if rewrite fails
+                break  # Keep the original if rewrite fails
             text = res.text.strip()
+
+    # Post-loop min_score gate. If the final critic verdict falls below the
+    # floor after we've exhausted the budget, refuse to ship and substitute
+    # the placeholder so a sub-threshold draft never reaches assemble_report.
+    if final_score is not None and final_score < min_score:
+        log.warning(
+            "brief.section_below_floor",
+            section=section.number,
+            title=section.title,
+            score=final_score,
+            min_score=min_score,
+            iterations=max_iterations,
+        )
+        return _placeholder(section)
 
     return text
 
