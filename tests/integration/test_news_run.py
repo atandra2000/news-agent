@@ -177,3 +177,74 @@ async def test_orchestrator_writes_when_required_deliverable_present(tmp_path, m
         out_path=out_file,
     )
     assert out.exists()
+
+
+async def test_dated_report_filename_unique_per_run(tmp_path, monkeypatch):
+    # The 2026-07-13 monthly report and the canonical slug-based file were
+    # byte-identical (both written from brief_slug(spec)). A second run of
+    # the same prompt overwrote the dated file. Fix: each run also writes a
+    # unique dated archive {timestamp}_{content_hash}.md, while the canonical
+    # slug-based file remains the latest-wins copy.
+    from hermes.pipeline import orchestrator
+
+    settings = _make_settings(tmp_path)
+    spec = BriefSpec(
+        title="Repeatable Report",
+        sections=[SectionSpec(number=1, title="Pulse", bullets=["a"])],
+        deliverables=["Model comparison matrix"],
+    )
+    search = _fake_search_provider([
+        SearchResult(title="S1", url="https://example.com/1", content="x"),
+    ])
+    router = _fake_router()
+
+    section_text = (
+        "## **1. Pulse**\n\n"
+        "Real analysis of the pulse, with a citation. [src:https://example.com/1]\n\n"
+        "## **Model comparison matrix**\n\n"
+        "| Model | Org | Score |\n|---|---|---|\n| A | X | 90 |\n"
+    )
+
+    async def _fake_synth(*args, **kwargs):
+        return section_text
+
+    monkeypatch.setattr(orchestrator, "_synthesize_section_parallel", _fake_synth)
+    # Isolate from the default MarkdownFileSink (which writes its own
+    # date-named copy); the sink is a separate concern and is tested
+    # elsewhere. This test is about the orchestrator's filename logic.
+    monkeypatch.setattr(orchestrator, "build_sinks", lambda _settings: [])
+
+    # Run twice with no explicit out_path so the slug-based canonical name
+    # is used. The two runs must produce TWO distinct dated archive files,
+    # while the canonical (slug) file is the same on disk and is what the
+    # function returns.
+    out1 = await run_news_pipeline(
+        spec, settings=settings, router=router, search=search,
+    )
+    out2 = await run_news_pipeline(
+        spec, settings=settings, router=router, search=search,
+    )
+
+    # The function's return value stays the canonical slug-based file.
+    assert out1 == out2
+    assert out1 == settings.reports_dir / "repeatable-report.md"
+    # The canonical file is the latest-wins copy (still exists).
+    assert out1.exists()
+
+    # Dated archive files are unique per run and live next to the canonical.
+    dated = sorted(settings.reports_dir.glob("*.md"))
+    assert len(dated) == 3, f"expected 1 canonical + 2 dated, got {dated}"
+    canonical = [p for p in dated if p.name == "repeatable-report.md"]
+    archives = [p for p in dated if p.name != "repeatable-report.md"]
+    assert len(canonical) == 1
+    assert len(archives) == 2
+    assert archives[0].name != archives[1].name
+    # The dated name encodes the run timestamp + a content-derived suffix.
+    import re
+    pat = re.compile(r"^\d{4}-\d{2}-\d{2}T\d+_[0-9a-f]{8}\.md$")
+    for a in archives:
+        assert pat.match(a.name), a.name
+    # The canonical file and the dated files all carry the same body.
+    canonical_text = out1.read_text(encoding="utf-8")
+    for a in archives:
+        assert a.read_text(encoding="utf-8") == canonical_text

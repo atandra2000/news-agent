@@ -407,9 +407,20 @@ async def run_news_pipeline(
     if out_path is None:
         from hermes.pipeline.spec import brief_slug
 
+        # Canonical name: prompt slug (one file per prompt; latest run wins).
         out_path = settings.reports_dir / f"{brief_slug(spec)}.md"
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(report.text, encoding="utf-8")
+
+    # Dated archive: one file per run; never overwritten. The 2026-07-13
+    # monthly report's dated file and its canonical slug-based copy were
+    # byte-identical (28,338 B) — a second run of the same prompt the next
+    # day would have overwritten the dated file. Run_id is derived from the
+    # content hash; uniqueness at sub-second resolution comes from the
+    # run_date microsecond suffix.
+    run_id_short = hashlib.sha256(report.text.encode("utf-8")).hexdigest()[:8]
+    dated = settings.reports_dir / f"{run_date.strftime('%Y-%m-%dT%H%M%S%f')}_{run_id_short}.md"
+    dated.write_text(report.text, encoding="utf-8")
 
     meta = {"date": run_date.strftime("%Y-%m-%d"), "profile": "news", "path": str(out_path)}
     for sink in build_sinks(settings):
