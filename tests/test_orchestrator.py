@@ -77,6 +77,64 @@ async def test_thin_section_attempts_synthesis(monkeypatch, tmp_path):
     assert "section omitted" not in out.lower()
 
 
+async def test_critical_section_attempts_synthesis(monkeypatch, tmp_path):
+    """A section with coverage verdict=CRITICAL must be ATTEMPTED, not short-circuited.
+
+    Why this test exists: the previous short-circuit was keyed on
+    ``coverage_verdict == "CRITICAL"`` and silently dropped the section. The
+    THIN test above would have passed on the old code too (THIN was never
+    short-circuited), so it cannot prove the short-circuit is gone. This test
+    uses ``CRITICAL`` to exercise the exact code path that was removed; it
+    would fail on the old code.
+    """
+    from hermes.pipeline import orchestrator as orch
+
+    sec = SectionSpec(number=6, title="Funding, M&A & Business", bullets=["rounds"])
+    spec = BriefSpec(title="T", sections=[sec])
+    sources = [
+        SearchResult(
+            title="F", url="https://example.com/1", source="theinformation",
+            extra={"category": "news"},
+        )
+    ]
+    router = MagicMock()
+    router.stats.total_tokens = 0
+
+    # Router emits a real-looking section with 100+ content words + a citation.
+    text = (
+        "## **6. Funding, M&A & Business**\n\n"
+        + ("Funding analysis paragraph with concrete content for the section. " * 15)
+        + "[src:https://example.com/1]"
+    )
+    router.complete = AsyncMock(return_value=ProviderResult(
+        text=text, model="t", provider="t", prompt_tokens=10, completion_tokens=20,
+    ))
+    # Critic returns a passing verdict so synthesize_section_with_review ships.
+    router.json_complete = AsyncMock(return_value={
+        "pass": True, "score": 0.9, "gaps": [], "missing_citations": False,
+        "cadence_ok": True, "has_cot_or_stub": False, "feedback": "",
+    })
+
+    settings = HermesSettings()
+    settings.storage.dir = tmp_path
+    cad = resolve_cadence("monthly")
+    semaphore = asyncio.Semaphore(1)
+
+    out = await _synthesize_section_parallel(
+        sec, sources, [], None, router, None, spec, settings,
+        cad=cad, date_label="July 2026", cadence_note="past 30 days",
+        per_section_sources=12, extra_queries=2, year="2026",
+        search_enabled=False, semaphore=semaphore,
+        coverage_verdict="CRITICAL",
+    )
+
+    # Real synthesis wins: writer's content is preserved (the old short-circuit
+    # would have returned a "section omitted" placeholder instead).
+    assert "Funding analysis" in out
+    # The "section omitted" placeholder must NOT be rendered on a CRITICAL verdict.
+    assert "section omitted" not in out.lower()
+
+
 async def test_thin_corpus_flag_reaches_writer_prompt(monkeypatch, tmp_path):
     """The writer prompt must carry the THIN CORPUS honesty note on THIN/CRITICAL.
 
