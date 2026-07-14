@@ -162,3 +162,42 @@ class TestCotPatternsFromMonthlyReport:
     def test_so_we_can_weave_removed(self):
         cleaned = sanitize_text("So we can weave these sources into a narrative about the disconnect.")
         assert has_leakage(cleaned) is False
+
+
+class TestUnsourcedMarkerStripped:
+    """The 2026-07-13 monthly report shipped with `[unsourced — industry knowledge]`
+    visible to readers. The writer is told to mark unsourced claims with that
+    tag so the critic can count them, but the tag is internal bookkeeping —
+    the reader should not see it, and the unsourced claim should be dropped
+    along with it. Sanitization strips the tag from rendered prose.
+
+    Counting (in ``report.audit_citation_discipline``) is unchanged — the
+    ``_UNSOURCED_MARKER_RE`` in report.py is applied to the raw LLM output
+    before the sanitizer runs.
+    """
+
+    def test_sanitize_drops_unsourced_marker_from_text(self):
+        text = "GPT-5 was released in 2026 [unsourced — industry knowledge]. Other claim with citation."
+        out = sanitize_text(text)
+        assert "[unsourced" not in out
+        assert "industry knowledge" not in out
+        # The unsourced claim is dropped along with its tag; the second
+        # sentence survives (it has no marker on it).
+        assert "GPT-5" not in out
+        assert "Other claim with citation" in out
+
+    def test_sanitize_drops_unsourced_marker_dash_form(self):
+        """The model can emit `[unsourced - ...]` (ASCII dash) instead of em-dash."""
+        text = "Claim A [unsourced - parametric knowledge]. Claim B."
+        out = sanitize_text(text)
+        assert "[unsourced" not in out
+        assert "parametric knowledge" not in out
+        assert "Claim A" not in out
+        assert "Claim B" in out
+
+    def test_sanitize_keeps_real_citation_brackets(self):
+        """``[1]`` / ``[src:URL]`` must not be conflated with unsourced markers."""
+        text = "Real claim [1]. Fake claim [unsourced — industry knowledge]."
+        out = sanitize_text(text)
+        assert "[1]" in out
+        assert "[unsourced" not in out

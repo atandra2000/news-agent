@@ -181,6 +181,18 @@ _COLLAPSE_LEADING_PUNCT = re.compile(r"^\s*[,;:]\s+")
 _COLLAPSE_DOUBLE_SPACE = re.compile(r"[ \t]{2,}")
 _COLLAPSE_BLANK_LINES = re.compile(r"\n{3,}")
 
+# Strip the writer's `[unsourced - ...]` / `[unsourced — ...]` markers from
+# rendered prose. The critic counts them in `report.audit_citation_discipline`
+# (a separate regex over raw output), but the reader should never see the
+# tag — and the unsourced claim that couldn't be cited is dropped along
+# with its tag. The dash is non-greedy and may be em/en/ASCII. The pattern
+# consumes the surrounding sentence so the unsourced claim disappears with
+# its tag (not a stranded "GPT-5 was released in 2026. Other claim.").
+_UNSOURCED_SENTENCE_RE = re.compile(
+    r"[^.!?\n]*\[unsourced\s*[—–-][^\]]*\][^.!?\n]*[.!?]?\s*",
+    re.IGNORECASE,
+)
+
 
 def sanitize_text(text: str) -> str:
     """Remove banned phrases and clean up artifacts from a prose string.
@@ -190,8 +202,14 @@ def sanitize_text(text: str) -> str:
     if not text:
         return text
 
+    # Drop entire sentences that carry an unsourced-claim tag — the tag is
+    # internal bookkeeping for the critic, and the claim itself is what
+    # couldn't be cited. The regex consumes the sentence + trailing
+    # punctuation; the blank-line collapse below cleans up the gap.
+    cleaned = _UNSOURCED_SENTENCE_RE.sub("", text)
+
     # Strip banned phrases (replace with empty string, not a placeholder).
-    cleaned = _BANNED_RE.sub("", text)
+    cleaned = _BANNED_RE.sub("", cleaned)
 
     # Clean up artifacts left by phrase removal.
     lines = cleaned.split("\n")
