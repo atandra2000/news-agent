@@ -244,6 +244,32 @@ def build_section_prompt(
         "List the gaps explicitly.\n"
         if thin_corpus else ""
     )
+    # Frontier / model sections require an explicit comparison table.
+    # The general "use a Markdown comparison table" rule is too soft — the
+    # writer tends to default to prose. The 2026-07-14 monthly §3 shipped
+    # 85 words of narrative with no table; the brief asks for "model and
+    # silicon comparison tables" as a Required Deliverable.
+    low_title = section.title.lower()
+    is_frontier_or_model = (
+        "frontier" in low_title
+        or "model" in low_title
+        or "silicon" in low_title
+        or "hardware" in low_title
+    )
+    frontier_block = ""
+    if is_frontier_or_model:
+        frontier_block = (
+            "\n\nFRONTIER / MODEL SECTION — TABLE REQUIRED:\n"
+            "Render a Markdown comparison table with these columns, in this order:\n"
+            "| Model | Developer | Context | Reasoning | Coding | Pricing | Release date |\n"
+            "If a field is unknown for a row, write `n/a` — do NOT omit the row. "
+            "Include at least 3 models actually released or substantially updated in the "
+            "report cadence window. After the model table, render a SECOND Markdown table "
+            "for chips / hardware (columns: Chip, Vendor, Process node, Memory, Notable use) "
+            "if the section bullets mention chips, hardware, serving, or silicon. "
+            "If you have no in-window chip data, write a one-sentence 'No in-window chip "
+            "releases' note after the model table — do not silently drop the table.\n"
+        )
 
     return f"""You are an expert AI research analyst writing ONE section of an institutional-grade AI industry report ({date_label}).
 
@@ -252,6 +278,7 @@ SECTION TO WRITE:
 
 What this section must cover:
 {bullets}
+{frontier_block}
 {cadence_line}
 REPORT-WIDE DELIVERABLES (these span the FULL report — include ONLY the ones relevant to THIS section; do NOT stub out the others as empty subheadings):
 {deliv}

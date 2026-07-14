@@ -7,6 +7,7 @@ from hermes.pipeline.spec import SectionSpec
 from hermes.pipeline.sanitizer import sanitize_text
 from hermes.pipeline.synthesize import (
     _content_word_count,
+    build_section_prompt,
     clean_section_text,
     count_citations,
     extract_prose,
@@ -446,4 +447,31 @@ def test_placeholder_default_reason_for_heuristic_provider():
     assert "No LLM available" in out
     # No required_category → falls back to "any".
     assert "`any`" in out
+
+
+# Task 3 (corpus-coverage-fixes): frontier/model sections must carry an
+# explicit Markdown-comparison-table requirement. The 2026-07-14 monthly
+# report's §3 "Frontier & Infrastructure" shipped as 85 words of prose with
+# no table; the general "use a Markdown comparison table" rule in the writer
+# prompt was too soft. These tests pin the section-title-conditional block.
+
+
+def test_frontier_section_prompt_requires_comparison_table():
+    sec = SectionSpec(number=3, title="Frontier & Infrastructure",
+                      bullets=["model releases", "chips", "serving frameworks"])
+    prompt = build_section_prompt(sec, [], "instructions", ["quality"], "July 2026")
+    lowered = prompt.lower()
+    # Explicit table requirement must be in the prompt
+    assert "comparison table" in lowered
+    assert "model" in lowered and "developer" in lowered and "context" in lowered
+    # Must mention silicon or hardware (so the writer includes chips)
+    assert "silicon" in lowered or "hardware" in lowered or "chip" in lowered
+
+
+def test_non_frontier_section_prompt_does_not_force_table():
+    sec = SectionSpec(number=6, title="Funding, M&A & Business", bullets=["rounds"])
+    prompt = build_section_prompt(sec, [], "instructions", ["quality"], "July 2026")
+    # The general "use a Markdown comparison table" rule is fine; the
+    # FRONTIER-SPECIFIC block must not appear.
+    assert "model, developer, context" not in prompt.lower()
 
