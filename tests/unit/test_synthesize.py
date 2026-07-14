@@ -7,6 +7,7 @@ from hermes.pipeline.spec import SectionSpec
 from hermes.pipeline.sanitizer import sanitize_text
 from hermes.pipeline.synthesize import (
     _content_word_count,
+    build_section_prompt,
     clean_section_text,
     count_citations,
     extract_prose,
@@ -417,3 +418,119 @@ async def test_section_rewrite_loop_passes_above_floor(monkeypatch):
     # Real prose ships when critic accepts.
     assert "Frontier models advanced significantly" in out
     assert "No LLM available" not in out
+
+
+# ── _placeholder: named missing category ────────────────────────────────────
+# Task 2: when synthesis fails after retry, the placeholder must name the
+# missing category so the reader knows what corpus to broaden next run.
+# The 2026-07-14 monthly report's four short-circuited sections were Required
+# Deliverables — Funding/Regulation/Enterprise/Predictions. The named-category
+# placeholder is the new "honest disclosure" the gate can't deliver.
+
+
+def test_placeholder_names_missing_category():
+    from hermes.pipeline.synthesize import _placeholder
+
+    sec = SectionSpec(number=6, title="Funding, M&A & Business")
+    out = _placeholder(sec, reason="writer emitted planning notes after retry",
+                       required_category="news")
+    assert "Required Deliverable" in out
+    assert "`news`" in out
+    assert "Funding, M&A & Business" in out
+
+
+def test_placeholder_default_reason_for_heuristic_provider():
+    from hermes.pipeline.synthesize import _placeholder
+
+    sec = SectionSpec(number=1, title="Pulse")
+    out = _placeholder(sec)  # no reason → default "no LLM available"
+    assert "No LLM available" in out
+    # No required_category → falls back to "any".
+    assert "`any`" in out
+
+
+# Task 3 (corpus-coverage-fixes): frontier/model sections must carry an
+# explicit Markdown-comparison-table requirement. The 2026-07-14 monthly
+# report's §3 "Frontier & Infrastructure" shipped as 85 words of prose with
+# no table; the general "use a Markdown comparison table" rule in the writer
+# prompt was too soft. These tests pin the section-title-conditional block.
+
+
+def test_frontier_section_prompt_requires_comparison_table():
+    sec = SectionSpec(number=3, title="Frontier & Infrastructure",
+                      bullets=["model releases", "chips", "serving frameworks"])
+    prompt = build_section_prompt(sec, [], "instructions", ["quality"], "July 2026")
+    lowered = prompt.lower()
+    # Explicit table requirement must be in the prompt
+    assert "comparison table" in lowered
+    assert "model" in lowered and "developer" in lowered and "context" in lowered
+    # Must mention silicon or hardware (so the writer includes chips)
+    assert "silicon" in lowered or "hardware" in lowered or "chip" in lowered
+
+
+def test_non_frontier_section_prompt_does_not_force_table():
+    sec = SectionSpec(number=6, title="Funding, M&A & Business", bullets=["rounds"])
+    prompt = build_section_prompt(sec, [], "instructions", ["quality"], "July 2026")
+    # The general "use a Markdown comparison table" rule is fine; the
+    # FRONTIER-SPECIFIC block must not appear.
+    assert "model, developer, context" not in prompt.lower()
+
+
+# Task 4 (corpus-coverage-fixes): for sections that need a specific category
+# (e.g. "official" for frontier-model sections, "news" for funding), the writer
+# should get the category-matched RSS feed at the top when keyword scores are
+# equal. Without the per-category tiebreaker, all RSS items are tied at boost=2
+# and the writer gets a shuffled list regardless of category stamp.
+
+
+def test_select_relevant_prefers_official_for_frontier_section():
+    # Three items: one official (openai), one community (substack), one news.
+    # All share the keyword so all score 1.0 on the base metric; the only
+    # differentiator is the per-category tiebreaker. Title "Frontier Model
+    # Releases" maps to required_category="official" via _SECTION_CATEGORY_HINTS,
+    # so the openai.com item must rank above the substack community item.
+    sec = SectionSpec(number=3, title="Frontier Model Releases",
+                      bullets=["Qwen3 model release"])
+    items = [
+        SearchResult(title="Qwen3 release", url="https://substack.example/x",
+                     content="Qwen3 release", source="rss",
+                     extra={"category": "community"},
+                     published_date="2026-07-14"),
+        SearchResult(title="Qwen3 release", url="https://openai.com/x",
+                     content="Qwen3 release", source="rss",
+                     extra={"category": "official"},
+                     published_date="2026-07-14"),
+        SearchResult(title="Qwen3 release", url="https://venturebeat.com/x",
+                     content="Qwen3 release", source="rss",
+                     extra={"category": "news"},
+                     published_date="2026-07-14"),
+    ]
+    out = select_relevant(sec, items, top_k=3, domain_cap=3, min_source_types=1)
+    urls = [s.url for s in out]
+    assert urls.index("https://openai.com/x") < urls.index("https://substack.example/x")
+
+
+def test_select_relevant_prefers_news_for_funding_section():
+    # Mirror of the frontier test: funding section needs category="news" via
+    # _SECTION_CATEGORY_HINTS, so the venturebeat news item must outrank the
+    # openai.com official item on equal keyword scores.
+    sec = SectionSpec(number=8, title="Funding, M&A & Business",
+                      bullets=["funding rounds"])
+    items = [
+        SearchResult(title="Funding round", url="https://openai.com/x",
+                     content="Funding round", source="rss",
+                     extra={"category": "official"},
+                     published_date="2026-07-14"),
+        SearchResult(title="Funding round", url="https://venturebeat.com/x",
+                     content="Funding round", source="rss",
+                     extra={"category": "news"},
+                     published_date="2026-07-14"),
+        SearchResult(title="Funding round", url="https://substack.example/x",
+                     content="Funding round", source="rss",
+                     extra={"category": "community"},
+                     published_date="2026-07-14"),
+    ]
+    out = select_relevant(sec, items, top_k=3, domain_cap=3, min_source_types=1)
+    urls = [s.url for s in out]
+    assert urls.index("https://venturebeat.com/x") < urls.index("https://openai.com/x")
+

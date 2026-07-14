@@ -107,3 +107,67 @@ def test_rss_collector_continues_after_per_feed_404(monkeypatch):
     assert items[0].title == "Survivor item"
     assert items[0].url == "https://example.valid/post-1"
     assert items[0].source_type == "rss"
+
+
+def test_rss_item_stamps_category_per_feed(monkeypatch):
+    """Per-feed category stamp: lab blogs (OpenAI) → 'official'; news outlets (VentureBeat) → 'news'.
+    Required for coverage verdicts: a feed from openai.com must count as official, not as
+    the legacy 'rss → news' bucket — the 2026-07-14 monthly report's root-cause fix.
+    """
+    import asyncio
+    import httpx
+
+    from hermes.collectors.rss import RSSCollector
+
+    openai_xml = """<?xml version="1.0"?><rss><channel>
+      <title>OpenAI News</title>
+      <item>
+        <title>GPT-5 release</title>
+        <link>https://openai.com/blog/gpt5</link>
+        <pubDate>Mon, 14 Jul 2026 12:00:00 +0000</pubDate>
+        <description>GPT-5 is now available.</description>
+      </item>
+    </channel></rss>"""
+    vb_xml = """<?xml version="1.0"?><rss><channel>
+      <title>VB AI</title>
+      <item>
+        <title>Funding round</title>
+        <link>https://venturebeat.com/ai/funding</link>
+        <pubDate>Mon, 14 Jul 2026 12:00:00 +0000</pubDate>
+        <description>Big round.</description>
+      </item>
+    </channel></rss>"""
+    responses = {
+        "https://openai.com/news/rss.xml": openai_xml,
+        "https://venturebeat.com/category/ai/feed/": vb_xml,
+    }
+
+    class R:
+        def __init__(self, url):
+            self.status_code = 200
+            self.text = responses[url]
+
+        def raise_for_status(self):
+            return None
+
+    class FakeClient:
+        def __init__(self, *a, **kw):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return None
+
+        async def get(self, url, *a, **kw):
+            return R(url)
+
+    monkeypatch.setattr(httpx, "AsyncClient", FakeClient)
+    c = RSSCollector(feeds=list(responses.keys()))
+    items = asyncio.run(
+        c.collect(since=datetime(2026, 7, 1, tzinfo=timezone.utc), limit=10)
+    )
+    by_url = {it.url: it for it in items}
+    assert by_url["https://openai.com/blog/gpt5"].extra["category"] == "official"
+    assert by_url["https://venturebeat.com/ai/funding"].extra["category"] == "news"

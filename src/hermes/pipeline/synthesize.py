@@ -9,6 +9,7 @@ from datetime import date, datetime
 from hermes.pipeline.planner import section_keywords
 from hermes.pipeline.search import SearchResult, _host
 from hermes.pipeline.spec import SectionSpec
+from hermes.pipeline.coverage import _section_required_category
 from hermes.llm.router import LLMRouter
 from hermes.logging import get_logger
 
@@ -50,7 +51,7 @@ def _recency_bonus(s: SearchResult, recency_days: int | None) -> int:
         return 0
 
 
-def _score_source(kws: set[str], s: SearchResult, recency_days: int | None) -> int:
+def _score_source(kws: set[str], s: SearchResult, recency_days: int | None, *, section: SectionSpec | None = None) -> float:
     title = (s.title or "").lower()
     body = f"{s.title} {s.content}".lower()
     score = 0
@@ -65,6 +66,17 @@ def _score_source(kws: set[str], s: SearchResult, recency_days: int | None) -> i
     # arxiv abstract for the same paper. Scope 8: pull from the priority
     # tiers the brief listed.
     score += source_priority_boost(s.source)
+    # Per-category tiebreaker: when the item's per-feed category stamp matches
+    # the section's required category, add a small bonus. Smaller than the
+    # keyword score (2x title) so keyword relevance still dominates; this just
+    # breaks ties between equally-relevant items from feeds of different
+    # categories (e.g. openai.com "official" outranks substack "community" on
+    # a frontier-model section). ponytail: one ternary, no new map.
+    if section is not None:
+        req_cat = _section_required_category(section)
+        item_cat = (getattr(s, "extra", None) or {}).get("category")
+        if req_cat and item_cat == req_cat:
+            score += 3.0
     return score
 
 
@@ -127,7 +139,7 @@ def select_relevant(
         return []
     kws = section_keywords(section)
     if kws:
-        scored = [( _score_source(kws, s, recency_days), s) for s in sources]
+        scored = [( _score_source(kws, s, recency_days, section=section), s) for s in sources]
         scored.sort(key=lambda x: x[0], reverse=True)
         # Keyword scoring found matches → use them.
         ranked = [s for _, s in scored if _ > 0]
@@ -193,7 +205,7 @@ def select_relevant(
         # Restore order: highest-priority first.
         # Recompute scores for stable sort.
         if kws:
-            rescored = [(_score_source(kws, s, recency_days), s) for s in picked]
+            rescored = [(_score_source(kws, s, recency_days, section=section), s) for s in picked]
             rescored.sort(key=lambda x: x[0], reverse=True)
             picked = [s for _, s in rescored]
 
@@ -224,6 +236,7 @@ def build_section_prompt(
     cadence_note: str = "",
     deliverables: list[str] | None = None,
     rag_context: str = "",
+    thin_corpus: bool = False,
 ) -> str:
     bullets = "\n".join(f"- {b}" for b in section.bullets) or "(cover comprehensively)"
     qual = "\n".join(f"- {q}" for q in quality[:12]) or "(none specified)"
@@ -233,6 +246,42 @@ def build_section_prompt(
     cadence_line = f"\nREPORT CADENCE: {cadence_note}\n" if cadence_note else ""
     rag_block = f"\n{rag_context}\n" if rag_context else ""
     sources_guardband = _SOURCES_GUARDBAND if not sources else ""
+    # THIN CORPUS honesty note: when the coverage verdict was THIN/CRITICAL,
+    # the writer must be transparent about gaps rather than fabricating from
+    # parametric knowledge. The note sits between the QUALITY BAR and the
+    # RETRIEVED SOURCES block so the writer reads it just before citing.
+    thin_note = (
+        "\nTHIN CORPUS: The retrieved sources for this section are sparse. "
+        "Be honest about what is and isn't covered; do not fabricate. "
+        "List the gaps explicitly.\n"
+        if thin_corpus else ""
+    )
+    # Frontier / model sections require an explicit comparison table.
+    # The general "use a Markdown comparison table" rule is too soft — the
+    # writer tends to default to prose. The 2026-07-14 monthly §3 shipped
+    # 85 words of narrative with no table; the brief asks for "model and
+    # silicon comparison tables" as a Required Deliverable.
+    low_title = section.title.lower()
+    is_frontier_or_model = (
+        "frontier" in low_title
+        or "model" in low_title
+        or "silicon" in low_title
+        or "hardware" in low_title
+    )
+    frontier_block = ""
+    if is_frontier_or_model:
+        frontier_block = (
+            "\n\nFRONTIER / MODEL SECTION — TABLE REQUIRED:\n"
+            "Render a Markdown comparison table with these columns, in this order:\n"
+            "| Model | Developer | Context | Reasoning | Coding | Pricing | Release date |\n"
+            "If a field is unknown for a row, write `n/a` — do NOT omit the row. "
+            "Include at least 3 models actually released or substantially updated in the "
+            "report cadence window. After the model table, render a SECOND Markdown table "
+            "for chips / hardware (columns: Chip, Vendor, Process node, Memory, Notable use) "
+            "if the section bullets mention chips, hardware, serving, or silicon. "
+            "If you have no in-window chip data, write a one-sentence 'No in-window chip "
+            "releases' note after the model table — do not silently drop the table.\n"
+        )
 
     return f"""You are an expert AI research analyst writing ONE section of an institutional-grade AI industry report ({date_label}).
 
@@ -241,6 +290,7 @@ SECTION TO WRITE:
 
 What this section must cover:
 {bullets}
+{frontier_block}
 {cadence_line}
 REPORT-WIDE DELIVERABLES (these span the FULL report — include ONLY the ones relevant to THIS section; do NOT stub out the others as empty subheadings):
 {deliv}
@@ -251,6 +301,7 @@ RESEARCH PRIORITIES (from the brief — follow these source priorities and angle
 QUALITY BAR (apply to this section):
 {qual}
 {rag_block}
+{thin_note}
 RETRIEVED SOURCES (cite with the exact token [src:URL] right after each claim):
 {src_block}
 {sources_guardband}
@@ -566,11 +617,13 @@ async def synthesize_section(
     rag_context: str = "",
     strict_retry: bool = False,
     max_tokens: int = 5000,
+    thin_corpus: bool = False,
 ) -> str:
     quality = quality or []
     deliverables = deliverables or []
     prompt = build_section_prompt(
-        section, sources, instructions, quality, date_label, cadence_note, deliverables, rag_context
+        section, sources, instructions, quality, date_label, cadence_note,
+        deliverables, rag_context, thin_corpus=thin_corpus,
     )
     if strict_retry:
         prompt += _STRICT_RETRY.format(n=section.number, t=section.title)
@@ -580,11 +633,29 @@ async def synthesize_section(
     return res.text.strip()
 
 
-def _placeholder(section: SectionSpec) -> str:
+def _placeholder(
+    section: SectionSpec,
+    *,
+    reason: str = "No LLM available to synthesize this section",
+    required_category: str | None = None,
+) -> str:
+    """Render a section that the writer couldn't produce.
+
+    The 2026-07-14 monthly report's four short-circuited sections were
+    Required Deliverables — Funding/Regulation/Enterprise/Predictions — and
+    readers were given an 18-word stub. The named-category placeholder is the
+    honest disclosure: name the missing category (``news`` / ``official`` /
+    ``research``) so the next run knows what corpus to broaden.
+    """
+    missing_cat = required_category or "any"
     return (
         f"## **{section.number}. {section.title}**\n\n"
-        f"_No LLM available to synthesize this section. Install/configure an LLM backend "
-        f"(HERMES_LLM_BACKEND) to generate content for: {', '.join(section.bullets) or 'see brief'}._"
+        f"_Section synthesis failed after retry: {reason}. "
+        f"This section's brief lists it as a Required Deliverable, but the "
+        f"retrieved corpus had insufficient evidence in the `{missing_cat}` "
+        f"category. Re-run with broader collectors or loosen the brief's "
+        f"Required Deliverables. The thin-corpus banner at the top of the "
+        f"report has the full per-section breakdown._"
     )
 
 
@@ -689,6 +760,7 @@ async def synthesize_section_with_review(
     min_score: float = 0.5,
     max_iterations: int = 2,
     max_tokens: int = 5000,
+    thin_corpus: bool = False,
 ) -> str:
     """Synthesize a section, then critique and optionally rewrite (bounded to
     ``max_iterations`` iterations; only rewrites if the critic flags issues).
@@ -698,6 +770,10 @@ async def synthesize_section_with_review(
     is replaced with the standard ``_placeholder(section)`` and the section is
     marked as failed. This gate fixes the 2026-07-13 bug where drafts with
     scores as low as 0.25 were shipped.
+
+    ``thin_corpus`` flows into the writer prompt as a "THIN CORPUS" honesty
+    note when the coverage verdict was THIN or CRITICAL — see
+    ``build_section_prompt``.
     """
     quality = quality or []
     deliverables = deliverables or []
@@ -713,6 +789,7 @@ async def synthesize_section_with_review(
         cadence_note=cadence_note,
         rag_context=rag_context,
         max_tokens=max_tokens,
+        thin_corpus=thin_corpus,
     )
     if text.startswith("## **") and "No LLM available" in text:
         return text  # Placeholder — skip critic
@@ -765,6 +842,7 @@ async def synthesize_section_with_review(
                 cadence_note,
                 deliverables,
                 rag_context,
+                thin_corpus=thin_corpus,
             )
             rewrite_prompt += f"""
 

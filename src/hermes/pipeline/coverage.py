@@ -59,6 +59,21 @@ def _category_for(source: str) -> str:
     return "community"  # conservative default — most "other" is community
 
 
+def _category_for_explicit(s: "SearchResult") -> str:
+    """Consult the explicit per-item category stamp (set by the RSS collector's
+    per-feed map) first; fall back to the legacy source-type → category map.
+
+    The stamp is what we want: a feed from openai.com is ``official`` regardless
+    of how the search backend names the source. Falls back to ``_category_for``
+    for sources that don't stamp a category (GitHub, arXiv, HN, etc.).
+    """
+    extra = getattr(s, "extra", None) or {}
+    cat = extra.get("category")
+    if cat:
+        return cat
+    return _category_for(s.source)
+
+
 # Section titles that map strongly to one category. When a section's title
 # matches a known category, coverage in that category is REQUIRED; coverage
 # in other categories is optional.
@@ -67,6 +82,7 @@ _SECTION_CATEGORY_HINTS: dict[str, str] = {
     "frontier model": "official",
     "model": "official",
     "hardware": "official",
+    "infrastructure": "official",  # monthly §3 "Frontier & Infrastructure" + "Hardware & Infrastructure"
     "open source": "research",
     "agent": "community",
     "agent & coding": "community",
@@ -104,6 +120,12 @@ class CoverageVerdict:
     sources_in_section: int
     categories_present: tuple[str, ...]
     required_category: str | None
+    # The human-readable category name to surface in the named-category
+    # placeholder when synthesis fails. Empty when the verdict is OK (no
+    # missing category to disclose). Populated from the section's required
+    # category (e.g. "news", "official", "research") for THIN/CRITICAL so the
+    # reader can see which corpus to broaden next run.
+    missing_category_label: str = ""
 
 
 def evaluate_coverage(
@@ -134,7 +156,7 @@ def evaluate_coverage(
     cats: dict[str, int] = {}
     total = 0
     for s in sources:
-        c = _category_for(s.source)
+        c = _category_for_explicit(s)
         cats[c] = cats.get(c, 0) + 1
         total += 1
 
@@ -156,6 +178,8 @@ def evaluate_coverage(
                 sources_in_section=total,
                 categories_present=tuple(sorted(cats.keys())),
                 required_category=None,
+                # No required category → no missing-category label to disclose.
+                missing_category_label="",
             ))
             continue
         # Category-required section.
@@ -173,6 +197,10 @@ def evaluate_coverage(
             sources_in_section=in_cat,
             categories_present=tuple(sorted(cats.keys())),
             required_category=required,
+            # Surface the missing category in the placeholder when coverage
+            # was below the OK threshold so the reader knows what corpus to
+            # broaden next run. OK sections leave this empty.
+            missing_category_label=required if verdict in ("THIN", "CRITICAL") else "",
         ))
     return verdicts
 

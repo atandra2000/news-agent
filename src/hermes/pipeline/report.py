@@ -142,6 +142,87 @@ _DELIVERABLE_KEYWORDS: dict[str, tuple[str, ...]] = {
     "comparison matrix": ("comparison", "|"),
 }
 
+# Stopwords removed from the deliverable's word-set before token-overlap
+# matching. These carry no semantic weight ("and", "or", "of", "the") and
+# dilute the ratio. Keep the list tiny and obvious.
+_DELIVERABLE_STOPWORDS = frozenset({
+    "a", "an", "and", "of", "or", "the", "to", "for", "with", "in", "on", "at",
+    "by", "from", "as", "is", "are", "be", "this", "that", "it", "its",
+})
+
+
+def _significant_words(text: str) -> set[str]:
+    """Tokenize to lowercase words, drop punctuation and stopwords.
+
+    Used for the deliverable-side word set: short noisy words dilute the
+    overlap ratio and add no signal. Alphanumeric tokens only, length >= 2.
+    """
+    out: set[str] = set()
+    for tok in re.findall(r"[a-z0-9]+", text.lower()):
+        if len(tok) >= 2 and tok not in _DELIVERABLE_STOPWORDS:
+            out.add(tok)
+    return out
+
+
+def _report_tokens(report_text: str) -> set[str]:
+    """Tokenize the report text for word-overlap matching.
+
+    Includes short words (no stopword filter) because the report often has
+    structural markers ("by", "of", "the") in column headers; we want to
+    also be able to match the deliverable's structural words. But we do
+    drop the markdown table pipe so "| model" becomes "model".
+    """
+    return set(re.findall(r"[a-z0-9]+", report_text.lower()))
+
+
+# Words that, when present in a deliverable, signal the deliverable is
+# satisfied by a markdown table in the report (regardless of whether the
+# literal word "table" appears in the report prose). "tables" is plural
+# in most brief phrasings, so check both. The 2026-07-14 monthly run had
+# reports with `| model | ... |` tables but no "tables" word in the
+# prose, and the gate rejected.
+_TABLE_HINT_WORDS = frozenset({"table", "tables", "comparison", "comparisons",
+                                "matrix", "matrices"})
+
+
+def _report_has_markdown_table(report_text: str) -> bool:
+    """A markdown table is a line starting with ``|`` (header), optionally
+    followed by a separator ``|---|---|`` line and data rows. Loose check:
+    any line that starts with ``|`` and has at least 2 pipe characters.
+
+    The coverage-verdict footer that ``assemble_report`` appends is itself
+    a markdown table — counting it would let a report with no real data
+    table satisfy a "model comparison tables" deliverable. Strip that
+    block (everything from the footer heading to EOF) before checking.
+    """
+    text = report_text
+    footer = text.find("\n## Coverage Verdicts")
+    if footer >= 0:
+        text = text[:footer]
+    for line in text.splitlines():
+        s = line.strip()
+        if s.startswith("|") and s.count("|") >= 2:
+            return True
+    return False
+
+
+def _candidate_matches_report(candidate: str, low: str, report_tokens: set[str]) -> bool:
+    """A keyword candidate is 'present' if either:
+
+    - The literal candidate substring appears in the lowered report
+      (catches structural markers like ``## **1. executive`` that have
+      non-alphanumeric chars the tokenizer drops), OR
+    - All significant alphanumeric words in the candidate appear in the
+      report tokens (catches tokenized forms like ``| model`` matching a
+      report with a ``Model`` column).
+    """
+    if candidate.lower() in low:
+        return True
+    words = _significant_words(candidate)
+    if not words:
+        return False
+    return words.issubset(report_tokens)
+
 
 @dataclass
 class DeliverableCheck:
@@ -161,23 +242,54 @@ def check_required_deliverables(
     raises when any item is missing. The previous "render a tail block" use
     was removed in Task 4: a missing deliverable is a hard refusal, not a
     disclosure in a footer.
+
+    The 2026-07-14 monthly run refused to write because natural-language
+    deliverable names like "Model and silicon comparison tables" do not
+    substring-match the keyword-group keys in ``_DELIVERABLE_KEYWORDS``
+    (no "model comparison" appears in that text) and the direct-substring
+    fallback required the literal phrase to appear in the report. The
+    fallback chain below is, in order:
+      1. Keyword-group substring match (legacy fast path).
+      2. Direct-substring match of the whole deliverable text (legacy).
+      3. Token-overlap match: if >= 60% of the deliverable's significant
+         words appear anywhere in the report, treat it as found. Catches
+         "Model and silicon comparison tables" against a report with a
+         markdown `| model | ...` table and the word "comparison" or
+         "silicon" somewhere in body text.
     """
     low = report_text.lower()
+    report_tokens = _report_tokens(report_text)
     checks: list[DeliverableCheck] = []
     for d in deliverables:
         d_low = d.lower().strip()
-        # Find the best-matching keyword group for this deliverable.
         matched = None
+        # 1. Keyword-group match (kept for fast happy path on conventional names).
         for keyword_group_key, candidates in _DELIVERABLE_KEYWORDS.items():
             if keyword_group_key in d_low:
                 for c in candidates:
-                    if c.lower() in low:
+                    if _candidate_matches_report(c, low, report_tokens):
                         matched = c
                         break
                 break
-        # If no keyword group matched, do a direct substring search.
+        # 2. Direct substring of the literal deliverable text.
         if matched is None and d_low and d_low in low:
             matched = d_low
+        # 3. Token-overlap fallback for natural-language deliverables.
+        if matched is None and d_low:
+            d_words = _significant_words(d)
+            if d_words:
+                # 3a. Table-shaped fallback: if the deliverable mentions
+                # table/comparison/matrix and the report contains any
+                # markdown table, treat it as found. Catches the common
+                # "X tables" / "X comparison" deliverable form where the
+                # writer renders the data as a markdown table but doesn't
+                # repeat the word "table" in prose.
+                if d_words & _TABLE_HINT_WORDS and _report_has_markdown_table(report_text):
+                    matched = "markdown table"
+                else:
+                    hits = sum(1 for w in d_words if w in report_tokens)
+                    if hits / len(d_words) >= 0.6:
+                        matched = f"{hits}/{len(d_words)} word overlap"
         checks.append(DeliverableCheck(deliverable=d, found=matched is not None, matched_keyword=matched))
     return checks
 

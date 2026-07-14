@@ -8,7 +8,7 @@ web research via the Tavily API.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Protocol
 
 import httpx
@@ -35,6 +35,10 @@ class SearchResult:
     content: str = ""
     published_date: str | None = None
     source: str | None = None
+    # Per-item extras carried from the collector (e.g. RSS per-feed category
+    # stamp). Coverage logic consults this first before falling back to
+    # source-type → category mapping.
+    extra: dict = field(default_factory=dict)
 
 
 class SearchProvider(Protocol):

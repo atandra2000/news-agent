@@ -283,6 +283,145 @@ class TestRequiredDeliverablesGate:
         gate_required_deliverables([], "any text at all")
         gate_required_deliverables(None, "any text at all")
 
+    def test_gate_passes_for_natural_language_deliverables(self):
+        # Real brief (prompts/ai_news_monthly.md) uses natural-language deliverable
+        # names that don't substring-match the keyword-group keys in
+        # _DELIVERABLE_KEYWORDS. The 2026-07-14 monthly run refused to write
+        # because "Model and silicon comparison tables" → no keyword group, and
+        # the direct-substring fallback required the literal phrase to appear.
+        # A report that *has* a comparison table + a benchmarks table + a
+        # funding table + key stats + strategic conclusions must pass the gate.
+        from hermes.pipeline.report import gate_required_deliverables
+
+        real_brief_deliverables = [
+            "Executive summary",
+            "Month timeline",
+            "Model and silicon comparison tables",
+            "Funding tables",
+            "Benchmark comparison tables",
+            "Key statistics",
+            "Strategic conclusions",
+        ]
+        realistic_report = (
+            "## **1. Executive Summary**\n"
+            "The month saw multiple releases and one major disappointment. "
+            "[src:https://x/1]\n\n"
+            "## **2. Month Timeline**\n"
+            "Timeline prose. [src:https://x/2]\n\n"
+            "## **3. Frontier & Infrastructure**\n"
+            "Qwen3 235B and several open-weight releases. [src:https://x/3]\n\n"
+            "| Model | Context | Reasoning | Coding | Pricing |\n"
+            "|---|---|---|---|---|\n"
+            "| Qwen3 235B | 128K | strong | strong | $0.20/M |\n\n"
+            "## **6. Funding, M&A & Business**\n"
+            "Notable rounds. [src:https://x/4]\n\n"
+            "| Entity | Amount | Round |\n"
+            "|---|---|---|\n"
+            "| Mistral | $640M | Series B |\n\n"
+            "## **9. Benchmarks & Capability**\n"
+            "GPQA, AIME, SWE-Bench, MMLU numbers. [src:https://x/5]\n\n"
+            "| Benchmark | Top Model | Score |\n"
+            "|---|---|---|\n"
+            "| GPQA | GLM-5.2 | 78 |\n\n"
+            "## **10. Predictions & Watchlist**\n"
+            "Forward-looking analysis. [src:https://x/6]\n\n"
+            "### Key Statistics\n"
+            "Twelve major releases, three funding rounds.\n\n"
+            "### Strategic Conclusions\n"
+            "The month consolidated around open-weight parity."
+        )
+        # No raise — every deliverable maps to a real element in the report.
+        gate_required_deliverables(real_brief_deliverables, realistic_report)
+
+    def test_check_required_deliverables_finds_table_for_natural_name(self):
+        # Direct test of the structured check: "Model and silicon comparison
+        # tables" must be detected as found when the report contains a markdown
+        # table with model-related columns. The exact phrase will not appear.
+        from hermes.pipeline.report import check_required_deliverables
+        checks = check_required_deliverables(
+            ["Model and silicon comparison tables"],
+            (
+                "## **3. Frontier**\n"
+                "Comparison. [src:https://x/1]\n\n"
+                "| Model | Context | Developer |\n"
+                "|---|---|---|\n"
+                "| Qwen3 | 128K | Alibaba |\n"
+            ),
+        )
+        assert checks[0].found is True, (
+            f"expected table-headed section to satisfy 'Model and silicon "
+            f"comparison tables', got matched={checks[0].matched_keyword!r}"
+        )
+
+    def test_check_required_deliverables_finds_funding_table(self):
+        # "Funding tables" (plural) — keyword group key is "funding table"
+        # (singular). The fix must still find a funding-shaped table in the
+        # report, even though the brief's deliverable text uses a different
+        # surface form.
+        from hermes.pipeline.report import check_required_deliverables
+        checks = check_required_deliverables(
+            ["Funding tables"],
+            (
+                "## **6. Funding**\n"
+                "Several rounds. [src:https://x/1]\n\n"
+                "| Entity | Amount | Lead |\n"
+                "|---|---|---|\n"
+                "| Mistral | $640M | a16z |\n"
+            ),
+        )
+        assert checks[0].found is True, (
+            f"expected funding-shaped table to satisfy 'Funding tables', "
+            f"got matched={checks[0].matched_keyword!r}"
+        )
+
+    def test_check_required_deliverables_finds_benchmark_table(self):
+        from hermes.pipeline.report import check_required_deliverables
+        checks = check_required_deliverables(
+            ["Benchmark comparison tables"],
+            (
+                "## **9. Benchmarks**\n"
+                "[src:https://x/1]\n\n"
+                "| Benchmark | Top Model | Score |\n"
+                "|---|---|---|\n"
+                "| MMLU | Qwen3 | 87 |\n"
+            ),
+        )
+        assert checks[0].found is True, (
+            f"expected benchmark-shaped table to satisfy 'Benchmark comparison "
+            f"tables', got matched={checks[0].matched_keyword!r}"
+        )
+
+    def test_check_required_deliverables_finds_key_statistics(self):
+        # "Key statistics" — no keyword group, no literal phrase in the report.
+        # The fix must catch a section that *labels* itself with "Key Statistics"
+        # or contains an obviously statistical table.
+        from hermes.pipeline.report import check_required_deliverables
+        checks = check_required_deliverables(
+            ["Key statistics"],
+            (
+                "## **10. Watchlist**\n"
+                "### Key Statistics\n"
+                "12 releases, $2.1B raised, 3 IPOs filed.\n"
+            ),
+        )
+        assert checks[0].found is True, (
+            f"expected 'Key Statistics' subheading to satisfy 'Key statistics', "
+            f"got matched={checks[0].matched_keyword!r}"
+        )
+
+    def test_check_required_deliverables_still_rejects_bare_missing(self):
+        # Regression guard: a truly absent deliverable must still be reported
+        # missing. The looser matcher must not become a rubber-stamp.
+        from hermes.pipeline.report import check_required_deliverables
+        checks = check_required_deliverables(
+            ["Model and silicon comparison tables"],
+            "## **1. Summary**\nJust prose, no tables, no model names.",
+        )
+        assert checks[0].found is False, (
+            "a report with no model/table content must NOT be reported as "
+            "satisfying 'Model and silicon comparison tables'"
+        )
+
 
 class TestThinCorpusBanner:
     """The 2026-07-13 monthly report had 20 sources for 13 sections (≈1.5/section)
