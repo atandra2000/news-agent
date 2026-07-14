@@ -9,6 +9,7 @@ from datetime import date, datetime
 from hermes.pipeline.planner import section_keywords
 from hermes.pipeline.search import SearchResult, _host
 from hermes.pipeline.spec import SectionSpec
+from hermes.pipeline.coverage import _section_required_category
 from hermes.llm.router import LLMRouter
 from hermes.logging import get_logger
 
@@ -50,7 +51,7 @@ def _recency_bonus(s: SearchResult, recency_days: int | None) -> int:
         return 0
 
 
-def _score_source(kws: set[str], s: SearchResult, recency_days: int | None) -> int:
+def _score_source(kws: set[str], s: SearchResult, recency_days: int | None, *, section: SectionSpec | None = None) -> int:
     title = (s.title or "").lower()
     body = f"{s.title} {s.content}".lower()
     score = 0
@@ -65,6 +66,17 @@ def _score_source(kws: set[str], s: SearchResult, recency_days: int | None) -> i
     # arxiv abstract for the same paper. Scope 8: pull from the priority
     # tiers the brief listed.
     score += source_priority_boost(s.source)
+    # Per-category tiebreaker: when the item's per-feed category stamp matches
+    # the section's required category, add a small bonus. Smaller than the
+    # keyword score (2x title) so keyword relevance still dominates; this just
+    # breaks ties between equally-relevant items from feeds of different
+    # categories (e.g. openai.com "official" outranks substack "community" on
+    # a frontier-model section). ponytail: one ternary, no new map.
+    if section is not None:
+        req_cat = _section_required_category(section)
+        item_cat = (getattr(s, "extra", None) or {}).get("category")
+        if req_cat and item_cat == req_cat:
+            score += 3.0
     return score
 
 
@@ -127,7 +139,7 @@ def select_relevant(
         return []
     kws = section_keywords(section)
     if kws:
-        scored = [( _score_source(kws, s, recency_days), s) for s in sources]
+        scored = [( _score_source(kws, s, recency_days, section=section), s) for s in sources]
         scored.sort(key=lambda x: x[0], reverse=True)
         # Keyword scoring found matches → use them.
         ranked = [s for _, s in scored if _ > 0]
@@ -193,7 +205,7 @@ def select_relevant(
         # Restore order: highest-priority first.
         # Recompute scores for stable sort.
         if kws:
-            rescored = [(_score_source(kws, s, recency_days), s) for s in picked]
+            rescored = [(_score_source(kws, s, recency_days, section=section), s) for s in picked]
             rescored.sort(key=lambda x: x[0], reverse=True)
             picked = [s for _, s in rescored]
 

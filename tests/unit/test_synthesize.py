@@ -475,3 +475,62 @@ def test_non_frontier_section_prompt_does_not_force_table():
     # FRONTIER-SPECIFIC block must not appear.
     assert "model, developer, context" not in prompt.lower()
 
+
+# Task 4 (corpus-coverage-fixes): for sections that need a specific category
+# (e.g. "official" for frontier-model sections, "news" for funding), the writer
+# should get the category-matched RSS feed at the top when keyword scores are
+# equal. Without the per-category tiebreaker, all RSS items are tied at boost=2
+# and the writer gets a shuffled list regardless of category stamp.
+
+
+def test_select_relevant_prefers_official_for_frontier_section():
+    # Three items: one official (openai), one community (substack), one news.
+    # All share the keyword so all score 1.0 on the base metric; the only
+    # differentiator is the per-category tiebreaker. Title "Frontier Model
+    # Releases" maps to required_category="official" via _SECTION_CATEGORY_HINTS,
+    # so the openai.com item must rank above the substack community item.
+    sec = SectionSpec(number=3, title="Frontier Model Releases",
+                      bullets=["Qwen3 model release"])
+    items = [
+        SearchResult(title="Qwen3 release", url="https://substack.example/x",
+                     content="Qwen3 release", source="rss",
+                     extra={"category": "community"},
+                     published_date="2026-07-14"),
+        SearchResult(title="Qwen3 release", url="https://openai.com/x",
+                     content="Qwen3 release", source="rss",
+                     extra={"category": "official"},
+                     published_date="2026-07-14"),
+        SearchResult(title="Qwen3 release", url="https://venturebeat.com/x",
+                     content="Qwen3 release", source="rss",
+                     extra={"category": "news"},
+                     published_date="2026-07-14"),
+    ]
+    out = select_relevant(sec, items, top_k=3, domain_cap=3, min_source_types=1)
+    urls = [s.url for s in out]
+    assert urls.index("https://openai.com/x") < urls.index("https://substack.example/x")
+
+
+def test_select_relevant_prefers_news_for_funding_section():
+    # Mirror of the frontier test: funding section needs category="news" via
+    # _SECTION_CATEGORY_HINTS, so the venturebeat news item must outrank the
+    # openai.com official item on equal keyword scores.
+    sec = SectionSpec(number=8, title="Funding, M&A & Business",
+                      bullets=["funding rounds"])
+    items = [
+        SearchResult(title="Funding round", url="https://openai.com/x",
+                     content="Funding round", source="rss",
+                     extra={"category": "official"},
+                     published_date="2026-07-14"),
+        SearchResult(title="Funding round", url="https://venturebeat.com/x",
+                     content="Funding round", source="rss",
+                     extra={"category": "news"},
+                     published_date="2026-07-14"),
+        SearchResult(title="Funding round", url="https://substack.example/x",
+                     content="Funding round", source="rss",
+                     extra={"category": "community"},
+                     published_date="2026-07-14"),
+    ]
+    out = select_relevant(sec, items, top_k=3, domain_cap=3, min_source_types=1)
+    urls = [s.url for s in out]
+    assert urls.index("https://venturebeat.com/x") < urls.index("https://openai.com/x")
+
