@@ -179,6 +179,77 @@ async def test_orchestrator_writes_when_required_deliverable_present(tmp_path, m
     assert out.exists()
 
 
+async def test_orchestrator_writes_frontier_table_when_corpus_has_models(tmp_path, monkeypatch):
+    # End-to-end smoke test: with a stubbed section synthesizer that emits
+    # a 3-row model table for §3, the assembled report's §3 must contain
+    # those rows. This proves the writer (via the section-assembly path in
+    # the orchestrator) actually renders the table when sources are present
+    # — a unit test on build_section_prompt proves the prompt *contains*
+    # the requirement; this test proves the writer *obeys* it. The frontier
+    # section is the one that previously shipped as a shallow prose-only
+    # block; without this assertion the regression is silent.
+    from hermes.pipeline import orchestrator
+
+    settings = _make_settings(tmp_path)
+    spec = BriefSpec(
+        title="T",
+        sections=[
+            SectionSpec(number=1, title="Executive Summary", bullets=["x"]),
+            SectionSpec(number=3, title="Frontier & Infrastructure",
+                        bullets=["model releases", "chips", "serving"]),
+            SectionSpec(number=4, title="Research Breakthroughs", bullets=["x"]),
+        ],
+        deliverables=["Model and silicon comparison tables"],
+    )
+
+    # A frontier section that contains a 3-row model table.
+    frontier_md = (
+        "## **3. Frontier & Infrastructure**\n\n"
+        "Three model releases this period.\n\n"
+        "| Model | Developer | Context | Reasoning | Coding | Pricing | Release date |\n"
+        "|---|---|---|---|---|---|---|\n"
+        "| Qwen3 235B | Alibaba | 128K | strong | strong | $0.20/M | 2026-07-11 |\n"
+        "| GPT-OSS | OpenAI | 64K | strong | strong | n/a | 2026-07-10 |\n"
+        "| DeepSeek V3.1 | DeepSeek | 128K | strong | strong | $0.30/M | 2026-07-09 |\n"
+        "\nNo in-window chip releases.\n"
+    )
+    base_md = "## **{n}. {t}**\n\nAnalysis paragraph. " * 10 + "[src:https://example.com/{n}]"
+    by_section = {
+        1: base_md.format(n=1, t="Executive Summary"),
+        3: frontier_md,
+        4: base_md.format(n=4, t="Research Breakthroughs"),
+    }
+
+    async def fake_sec(sec, *a, **kw):
+        return by_section.get(sec.number, base_md.format(n=sec.number, t=sec.title))
+
+    monkeypatch.setattr(orchestrator, "_synthesize_section_parallel", fake_sec)
+
+    search = _fake_search_provider([
+        SearchResult(
+            title="x", url="https://example.com/q", source="rss",
+            extra={"category": "official"}, published_date="2026-07-14",
+        ),
+    ])
+    router = _fake_router()
+    router.json_complete = AsyncMock(return_value={"pass": True, "score": 0.9})
+    out = await run_news_pipeline(
+        spec, settings=settings, router=router, search=search,
+        out_path=tmp_path / "out.md",
+    )
+    text = out.read_text()
+    # Frontier table rendered.
+    assert "| Qwen3 235B |" in text
+    assert "| DeepSeek V3.1 |" in text
+    # At least 3 model rows (one per developer).
+    rows = (
+        text.count("| Alibaba |")
+        + text.count("| OpenAI |")
+        + text.count("| DeepSeek |")
+    )
+    assert rows >= 3, f"expected >=3 model rows in frontier table, got {rows}"
+
+
 async def test_dated_report_filename_unique_per_run(tmp_path, monkeypatch):
     # The 2026-07-13 monthly report and the canonical slug-based file were
     # byte-identical (both written from brief_slug(spec)). A second run of
