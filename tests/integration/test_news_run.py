@@ -104,3 +104,76 @@ async def test_orchestrator_writes_file_for_simple_prompt(tmp_path):
     assert "## **Test Report**" in text
     assert "## **1. Pulse**" in text
     assert "## **2. Trends**" in text
+
+
+async def test_orchestrator_refuses_write_when_required_deliverable_missing(tmp_path):
+    # The 2026-07-13 monthly report shipped with a "Required Deliverables —
+    # Coverage Check" footer that listed missing items AFTER the file was
+    # already on disk. Task 4 makes the gate a pre-write refusal: any
+    # required deliverable that didn't make it into the assembled text
+    # raises PipelineRefusedError and the report file is never written.
+    from hermes.errors import PipelineRefusedError
+
+    settings = _make_settings(tmp_path)
+    out_file = tmp_path / "out.md"
+    spec = BriefSpec(
+        title="Test Report",
+        sections=[SectionSpec(number=1, title="Pulse", bullets=["a"])],
+        # The brief mandates a "Model comparison matrix". The fake router
+        # below emits no table, so the deliverable is absent from the
+        # assembled report.
+        deliverables=["Model comparison matrix"],
+    )
+    search = _fake_search_provider([
+        SearchResult(title="S1", url="https://example.com/1", content="x"),
+    ])
+    router = _fake_router(text="## **1. Pulse**\nJust prose. [src:https://example.com/1]")
+
+    with pytest.raises(PipelineRefusedError) as excinfo:
+        await run_news_pipeline(
+            spec, settings=settings, router=router, search=search,
+            out_path=out_file,
+        )
+    # The refused error names the missing deliverable.
+    assert "Model comparison matrix" in str(excinfo.value)
+    # Critically: the file was NOT written.
+    assert not out_file.exists()
+
+
+async def test_orchestrator_writes_when_required_deliverable_present(tmp_path, monkeypatch):
+    # Sanity: the gate does not false-positive when the deliverable is
+    # genuinely in the report. Bypasses the section-level validity gate
+    # (which is intentionally strict on a fake LLM router) by replacing
+    # _synthesize_section_parallel with a stub that emits a section that
+    # includes a model-comparison table — the brief's deliverable keyword.
+    from hermes.pipeline import orchestrator
+
+    settings = _make_settings(tmp_path)
+    out_file = tmp_path / "out.md"
+    spec = BriefSpec(
+        title="Test Report",
+        sections=[SectionSpec(number=1, title="Pulse", bullets=["a"])],
+        deliverables=["Model comparison matrix"],
+    )
+    search = _fake_search_provider([
+        SearchResult(title="S1", url="https://example.com/1", content="x"),
+    ])
+    router = _fake_router()
+
+    section_text = (
+        "## **1. Pulse**\n\n"
+        "Real analysis of the pulse, with a citation. [src:https://example.com/1]\n\n"
+        "## **Model comparison matrix**\n\n"
+        "| Model | Org | Score |\n|---|---|---|\n| A | X | 90 |\n"
+    )
+
+    async def _fake_synth(*args, **kwargs):
+        return section_text
+
+    monkeypatch.setattr(orchestrator, "_synthesize_section_parallel", _fake_synth)
+
+    out = await run_news_pipeline(
+        spec, settings=settings, router=router, search=search,
+        out_path=out_file,
+    )
+    assert out.exists()

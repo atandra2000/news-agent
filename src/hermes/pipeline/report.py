@@ -156,11 +156,11 @@ def check_required_deliverables(
 ) -> list[DeliverableCheck]:
     """Soft check: which deliverables have a matching element in the report?
 
-    Returns a list with one entry per deliverable. Used by the orchestrator
-    to surface missing deliverables at the end of the report so the gap is
-    transparent to readers (the 2026-07-13 monthly report had no model
-    comparison matrix, no funding table outside §8, no benchmark table —
-    and nothing told the reader any of these were missing).
+    Returns a list with one entry per deliverable. The orchestrator's
+    pre-write gate (see ``gate_required_deliverables``) consumes this and
+    raises when any item is missing. The previous "render a tail block" use
+    was removed in Task 4: a missing deliverable is a hard refusal, not a
+    disclosure in a footer.
     """
     low = report_text.lower()
     checks: list[DeliverableCheck] = []
@@ -182,21 +182,34 @@ def check_required_deliverables(
     return checks
 
 
-def format_missing_deliverables_note(checks: list[DeliverableCheck]) -> str:
-    """Render a short 'Missing Deliverables' note for the report tail.
+def gate_required_deliverables(
+    deliverables: list[str] | None,
+    report_text: str,
+) -> None:
+    """Pre-write gate. Raises PipelineRefusedError when any required deliverable
+    is missing from the assembled report.
 
-    Empty string when nothing is missing — the gate is invisible on a clean run.
+    The 2026-07-13 monthly report wrote a 'Required Deliverables' footer
+    naming the missing items AFTER the file was already on disk — readers
+    got a partial report with the gap disclosed only in a tail block. The
+    gate now runs *before* ``out_path.write_text``: the contract is that
+    shipping a report that omits a brief-mandated deliverable is a hard
+    refusal, not a footnote.
     """
+    if not deliverables:
+        return
+    from hermes.errors import PipelineRefusedError
+
+    checks = check_required_deliverables(deliverables, report_text)
     missing = [c for c in checks if not c.found]
     if not missing:
-        return ""
-    lines = ["", "## **Required Deliverables — Coverage Check**", ""]
-    lines.append("The following deliverables from the brief's Required Deliverables list were not detected in the report:")
-    for c in missing:
-        lines.append(f"- {c.deliverable}")
-    lines.append("")
-    lines.append("_This gate surfaces missing deliverables explicitly so readers can request a re-run with the missing sections filled._")
-    return "\n".join(lines)
+        return
+    names = ", ".join(c.deliverable for c in missing)
+    raise PipelineRefusedError(
+        f"refusing to write report: {len(missing)} required deliverable(s) "
+        f"missing ({names}). Re-run with broader search/collectors or "
+        f"loosen the brief's Required Deliverables."
+    )
 
 
 def thin_corpus_banner(
@@ -347,16 +360,11 @@ def assemble_report(
     if ref_block:
         full = full.rstrip() + "\n\n" + ref_block + "\n"
 
-    # Required Deliverables gate: append a "Coverage Check" tail listing any
-    # brief-mandated deliverables that didn't make it into the report. The
-    # 2026-07-13 monthly report's "Required Deliverables" list (model
-    # comparison matrix, funding tables, benchmark comparison tables, etc.)
-    # was never enforced — the gap is invisible to readers without this gate.
-    if spec.deliverables:
-        checks = check_required_deliverables(spec.deliverables, full)
-        note = format_missing_deliverables_note(checks)
-        if note:
-            full = full.rstrip() + "\n" + note + "\n"
+    # Pre-write deliverable gate is the orchestrator's responsibility — see
+    # gate_required_deliverables in orchestrator.py:run_news_pipeline. It
+    # runs *after* assemble_report returns and *before* out_path.write_text,
+    # so a missing deliverable refuses the write rather than appending a
+    # 'Coverage Check' footer to a file already on disk.
 
     # Thin-corpus banner: a top-of-report callout when sources-per-section is
     # too low to support real analysis. Distinguishes "nothing happened" from

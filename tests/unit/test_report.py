@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from hermes.pipeline.report import assemble_report, drop_empty_subheadings, resolve_citations
 from hermes.pipeline.search import SearchResult
 from hermes.pipeline.spec import BriefSpec, SectionSpec
@@ -203,47 +205,32 @@ class TestRequiredDeliverablesGate:
     """The Required Deliverables list is parsed from the prompt but was never
     enforced. The 2026-07-13 monthly report's deliverables ('Model comparison
     matrix', 'Funding tables', 'Benchmark comparison tables', 'Key statistics')
-    were largely missing, with no surface area telling the reader. This gate
-    appends a 'Coverage Check' section listing any missing deliverable."""
+    were largely missing, with no surface area telling the reader.
 
-    def test_missing_deliverable_surfaced(self):
-        from hermes.pipeline.spec import BriefSpec, SectionSpec
-        spec = BriefSpec(
-            title="T",
-            sections=[SectionSpec(number=1, title="Exec")],
-            deliverables=["Model comparison matrix", "Funding tables", "Benchmark comparison tables"],
-        )
-        # The report has no tables, no model comparison, no funding, no benchmark
-        # table — all three are missing.
-        md = "## **1. Exec**\nThis report has no tables at all. [src:https://x/1]"
-        rep = assemble_report(spec, [md], _sources())
-        assert "Required Deliverables" in rep.text
-        assert "Coverage Check" in rep.text
-        assert "Model comparison matrix" in rep.text
-        assert "Funding tables" in rep.text
-        assert "Benchmark comparison tables" in rep.text
+    Pre-write refusal (Task 4): the orchestrator now calls
+    ``gate_required_deliverables`` *before* writing the report. Any required
+    deliverable that did not make it into the assembled text raises
+    ``PipelineRefusedError`` and the file is not written. The previous
+    post-write 'Coverage Check' footer in the assembled text is gone — the
+    report simply is not written."""
 
-    def test_present_deliverable_not_listed_as_missing(self):
+    def test_assemble_no_longer_appends_coverage_check_footer(self):
+        # The 2026-07-13 footer was a misleading "Required Deliverables —
+        # Coverage Check" tail that named the missing items AFTER the report
+        # was already on disk. With the pre-write gate, the report is refused
+        # before writing, so assemble_report no longer appends that tail.
         from hermes.pipeline.spec import BriefSpec, SectionSpec
         spec = BriefSpec(
             title="T",
             sections=[SectionSpec(number=1, title="Exec")],
             deliverables=["Model comparison matrix", "Funding tables"],
         )
-        # The report has a model comparison table; funding is missing.
-        md = (
-            "## **1. Exec**\n\n"
-            "## **Model comparison matrix**\n\n"
-            "| Model | Org | Score |\n|---|---|---|\n| A | X | 90 |\n"
-        )
+        md = "## **1. Exec**\nThis report has no tables at all. [src:https://x/1]"
         rep = assemble_report(spec, [md], _sources())
-        # Funding tables is missing → listed in coverage check.
-        assert "Funding tables" in rep.text
-        # Model comparison matrix is present → NOT in the missing list.
-        # The text appears in the report body, so we look at the *missing* list
-        # specifically (it should not appear under the "missing" bullet).
-        assert "Required Deliverables" in rep.text
-        assert "- Model comparison matrix" not in rep.text
+        # No 'Coverage Check' tail in the assembled text — the orchestrator
+        # gate refuses the write before this string is ever produced.
+        assert "Coverage Check" not in rep.text
+        assert "Required Deliverables — Coverage Check" not in rep.text
 
     def test_no_coverage_check_when_all_deliverables_present(self):
         from hermes.pipeline.spec import BriefSpec, SectionSpec
@@ -267,6 +254,34 @@ class TestRequiredDeliverablesGate:
         assert checks[0].deliverable == "Model comparison matrix"
         assert checks[1].found is False
         assert checks[1].deliverable == "Nonexistent thing"
+
+    def test_gate_required_deliverables_passes_when_all_present(self):
+        from hermes.pipeline.report import gate_required_deliverables
+        # No raise when every deliverable is in the report.
+        gate_required_deliverables(
+            ["Model comparison matrix", "Executive summary"],
+            "## **1. Exec**\nHas a model comparison matrix.\n\n| Model | Score |\n|---|---|---|\n| A | 90 |\n",
+        )
+
+    def test_gate_required_deliverables_raises_on_missing(self):
+        from hermes.errors import PipelineRefusedError
+        from hermes.pipeline.report import gate_required_deliverables
+        with pytest.raises(PipelineRefusedError) as excinfo:
+            gate_required_deliverables(
+                ["Model comparison matrix", "Funding tables"],
+                "## **1. Exec**\nThis report has no tables at all.",
+            )
+        msg = str(excinfo.value)
+        # Names of the missing items appear in the error.
+        assert "Funding tables" in msg
+        # "Model comparison matrix" is also missing, but we only assert the
+        # one we know to be missing — order is not guaranteed.
+
+    def test_gate_required_deliverables_no_op_when_list_empty(self):
+        from hermes.pipeline.report import gate_required_deliverables
+        # Empty list → no raise, no work.
+        gate_required_deliverables([], "any text at all")
+        gate_required_deliverables(None, "any text at all")
 
 
 class TestThinCorpusBanner:

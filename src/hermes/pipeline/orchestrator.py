@@ -17,7 +17,7 @@ from hermes.output import build_sinks
 from hermes.pipeline.adapter import PromptAdapter
 from hermes.pipeline.cadence import CadenceSpec, resolve_cadence
 from hermes.pipeline.planner import plan_queries
-from hermes.pipeline.report import assemble_report
+from hermes.pipeline.report import assemble_report, gate_required_deliverables
 from hermes.pipeline.retrieval import embed_chunks, format_rag_context, load_past_reports, retrieve_similar
 from hermes.pipeline.search import (
     SearchProvider,
@@ -397,6 +397,12 @@ async def run_news_pipeline(
     sections_md = await asyncio.gather(*tasks)
 
     report = assemble_report(spec, list(sections_md), sources, verdicts=verdicts)
+
+    # Pre-write deliverable gate. The 2026-07-13 monthly report shipped with
+    # a "Required Deliverables — Coverage Check" footer listing missing items
+    # AFTER the file was already on disk — readers got a partial report with
+    # the gap disclosed only in a tail block. Refuse to write instead.
+    gate_required_deliverables(spec.deliverables, report.text)
 
     if out_path is None:
         from hermes.pipeline.spec import brief_slug
