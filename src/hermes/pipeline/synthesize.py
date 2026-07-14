@@ -378,6 +378,18 @@ _SCRATCHPAD_HEADINGS = (
 )
 # Trailing separators after which only meta-commentary follows.
 _TRAIL_SEPARATORS = ("\n---\n", "\n***\n", "\n___\n")
+# Inline planning-debris patterns that appear AFTER a real heading but are
+# still scratchpad, not prose. These mark the boundary between the LLM's
+# internal outline/instruction block and the actual answer.
+_INLINE_PLANNING_MARKERS = (
+    "\n... prose ...\n",
+    "\nStructure:\n",
+    "\nMake sure to cite every claim",
+    "\nFor example:\n",
+    "\nWe can write:",
+    "\nSo we can add a paragraph",
+    "\n**Month at a Glance (",
+)
 
 
 def extract_prose(text: str, *, title: str | None = None) -> str:
@@ -428,6 +440,13 @@ def extract_prose(text: str, *, title: str | None = None) -> str:
                 if h.start() > first_real.start() and text[h.start():h.end()] == heading_line:
                     start = h.start()  # keep advancing → lands on the last match
         text = text[start:]
+
+    # Drop inline planning debris that appears AFTER the first real heading.
+    # Stops at the earliest marker in text position; the heading is preserved.
+    marker_positions = [text.find(m) for m in _INLINE_PLANNING_MARKERS]
+    valid = [i for i in marker_positions if i > 0]
+    if valid:
+        text = text[: min(valid)]
 
     # Strip trailing meta after a horizontal-rule separator.
     for sep in _TRAIL_SEPARATORS:

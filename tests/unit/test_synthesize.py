@@ -256,3 +256,40 @@ def test_extract_prose_legit_repeated_subheading_survives():
     assert cleaned.count("### Funding Tables") == 2
     assert "table one" in cleaned
     assert "table two" in cleaned
+
+
+def test_extract_prose_strips_inline_planning_debris_after_heading():
+    raw = """## **3. Frontier & Infrastructure**
+
+... prose ...
+
+**Month at a Glance (Frontier & Infrastructure)**
+- [date] ...
+...
+
+**Infrastructure Comparison Table**
+| ... |
+
+**Key Statistics**
+- ...
+
+**Strategic Conclusions**
+...
+
+Similarly, OpenScience might be an AI workbench...
+
+Structure:
+
+- Intro: ...
+- Serving Frameworks: ...
+- Make sure to cite every claim.
+- The vLLM release had 558 commits: need citation for that.
+
+## **4. Research Breakthroughs**"""
+    out = extract_prose(raw, title="Frontier & Infrastructure")
+    assert "... prose ..." not in out
+    assert "Structure:" not in out
+    assert "Make sure to cite every claim" not in out
+    assert "**4. Research Breakthroughs**" not in out
+    # Real heading is preserved:
+    assert out.startswith("## **3. Frontier & Infrastructure**")
