@@ -170,28 +170,26 @@ async def _synthesize_section_parallel(
     semaphore: asyncio.Semaphore,
     max_tokens: int = 5000,
     coverage_verdict: str | None = None,
+    missing_category_label: str = "",
 ) -> str:
     """Synthesize one section with RAG context + critic loop + CoT backstop.
 
     ``coverage_verdict`` is one of "OK" / "THIN" / "CRITICAL" / None (unknown).
-    CRITICAL sections are short-circuited to a transparent "section omitted"
-    marker — the writer cannot synthesize from nothing, and we don't want to
-    burn an LLM call on a doomed attempt. THIN sections proceed but the writer
-    is told the corpus is thin so it can be honest about gaps.
+    The section is ALWAYS attempted: a THIN/CRITICAL verdict flows into the
+    writer prompt as a "thin corpus" honesty note (see synthesize.build_section_prompt)
+    so the writer can be transparent about gaps rather than fabricate. If the
+    resulting synthesis fails the substance floor, the standard
+    ``_placeholder`` path runs (line 264+) and names the missing category.
+    The 2026-07-14 monthly report had 4 sections short-circuited to a
+    "section omitted" stub despite the brief marking them as Required
+    Deliverables; the writer can usually produce a thin-but-honest section
+    even on a CRITICAL corpus.
     """
     from hermes.pipeline.report import drop_empty_subheadings
     from hermes.pipeline.sanitizer import sanitize_text
-    from hermes.pipeline.synthesize import extract_prose
+    from hermes.pipeline.synthesize import extract_prose, _placeholder
 
-    # Short-circuit CRITICAL: no useful evidence for this section. Drop it
-    # transparently instead of forcing the writer to invent.
-    if coverage_verdict == "CRITICAL":
-        log.warning("section_critical_drop", section=sec.number, title=sec.title)
-        return (
-            f"## **{sec.number}. {sec.title}**\n\n"
-            f"_Section omitted: source coverage verdict is CRITICAL "
-            f"(insufficient retrieved evidence to write a real analysis for this section)._"
-        )
+    thin_corpus = coverage_verdict in ("THIN", "CRITICAL")
 
     async with semaphore:
         rag_context = ""
@@ -216,6 +214,7 @@ async def _synthesize_section_parallel(
             rag_context=rag_context, max_tokens=max_tokens,
             min_score=settings.report.min_section_score,
             max_iterations=settings.report.max_rewrite_iterations,
+            thin_corpus=thin_corpus,
         )
 
         # Research loop: extra queries if citations are thin.
@@ -233,6 +232,7 @@ async def _synthesize_section_parallel(
                     rag_context=rag_context, max_tokens=max_tokens,
                     min_score=settings.report.min_section_score,
                     max_iterations=settings.report.max_rewrite_iterations,
+                    thin_corpus=thin_corpus,
                 )
 
         # CoT backstop + sanitizer.
@@ -262,11 +262,9 @@ async def _synthesize_section_parallel(
                 text = cleaned_retry
             else:
                 log.warning("section_invalid_placeholder", section=sec.number, title=sec.title)
-                text = (
-                    f"## **{sec.number}. {sec.title}**\n\n"
-                    f"_Synthesis for this section did not produce valid, substantial prose "
-                    f"after retry (writer emitted planning notes or a thin stub instead of analysis). "
-                    f"Re-run to regenerate._"
+                text = _placeholder(
+                    sec, reason="writer emitted planning notes or a thin stub after retry",
+                    required_category=missing_category_label or None,
                 )
 
         log.info("section_done", section=sec.number, title=sec.title, tokens=router.stats.total_tokens)
@@ -371,8 +369,10 @@ async def run_news_pipeline(
     extra_queries = adapter_state.extra_queries if adapter_state else settings.search.extra_queries
 
     # Coverage verdicts: per-section OK/THIN/CRITICAL classification based on
-    # the retrieved corpus. Drives both writer-prompt honesty and CRITICAL
-    # short-circuit (no LLM call when there's nothing to write about).
+    # the retrieved corpus. Drives the writer-prompt honesty note on THIN/CRITICAL
+    # so the writer is told the corpus is thin and can be transparent about gaps
+    # rather than fabricating. If a section's synthesis still fails the substance
+    # floor, the named-category placeholder is rendered in its place.
     from hermes.pipeline.coverage import evaluate_coverage
     verdicts = evaluate_coverage(spec, sources)
     verdict_by_num = {v.section_number: v for v in verdicts}
@@ -392,6 +392,7 @@ async def run_news_pipeline(
             cad, date_label, cadence_note, per_section_sources, extra_queries,
             year, True, semaphore, max_tokens=max_tokens,
             coverage_verdict=verdict_by_num.get(sec.number).verdict if sec.number in verdict_by_num else None,
+            missing_category_label=verdict_by_num.get(sec.number).missing_category_label if sec.number in verdict_by_num else "",
         )
         for sec in spec.sections
     ]

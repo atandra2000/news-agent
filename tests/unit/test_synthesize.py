@@ -417,3 +417,33 @@ async def test_section_rewrite_loop_passes_above_floor(monkeypatch):
     # Real prose ships when critic accepts.
     assert "Frontier models advanced significantly" in out
     assert "No LLM available" not in out
+
+
+# ── _placeholder: named missing category ────────────────────────────────────
+# Task 2: when synthesis fails after retry, the placeholder must name the
+# missing category so the reader knows what corpus to broaden next run.
+# The 2026-07-14 monthly report's four short-circuited sections were Required
+# Deliverables — Funding/Regulation/Enterprise/Predictions. The named-category
+# placeholder is the new "honest disclosure" the gate can't deliver.
+
+
+def test_placeholder_names_missing_category():
+    from hermes.pipeline.synthesize import _placeholder
+
+    sec = SectionSpec(number=6, title="Funding, M&A & Business")
+    out = _placeholder(sec, reason="writer emitted planning notes after retry",
+                       required_category="news")
+    assert "Required Deliverable" in out
+    assert "`news`" in out
+    assert "Funding, M&A & Business" in out
+
+
+def test_placeholder_default_reason_for_heuristic_provider():
+    from hermes.pipeline.synthesize import _placeholder
+
+    sec = SectionSpec(number=1, title="Pulse")
+    out = _placeholder(sec)  # no reason → default "no LLM available"
+    assert "No LLM available" in out
+    # No required_category → falls back to "any".
+    assert "`any`" in out
+

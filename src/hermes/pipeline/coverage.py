@@ -119,6 +119,12 @@ class CoverageVerdict:
     sources_in_section: int
     categories_present: tuple[str, ...]
     required_category: str | None
+    # The human-readable category name to surface in the named-category
+    # placeholder when synthesis fails. Empty when the verdict is OK (no
+    # missing category to disclose). Populated from the section's required
+    # category (e.g. "news", "official", "research") for THIN/CRITICAL so the
+    # reader can see which corpus to broaden next run.
+    missing_category_label: str = ""
 
 
 def evaluate_coverage(
@@ -171,6 +177,8 @@ def evaluate_coverage(
                 sources_in_section=total,
                 categories_present=tuple(sorted(cats.keys())),
                 required_category=None,
+                # No required category → no missing-category label to disclose.
+                missing_category_label="",
             ))
             continue
         # Category-required section.
@@ -188,6 +196,10 @@ def evaluate_coverage(
             sources_in_section=in_cat,
             categories_present=tuple(sorted(cats.keys())),
             required_category=required,
+            # Surface the missing category in the placeholder when coverage
+            # was below the OK threshold so the reader knows what corpus to
+            # broaden next run. OK sections leave this empty.
+            missing_category_label=required if verdict in ("THIN", "CRITICAL") else "",
         ))
     return verdicts
 
