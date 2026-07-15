@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from hermes.pipeline.search import SearchResult
-from hermes.pipeline.spec import SectionSpec
-from hermes.pipeline.sanitizer import sanitize_text
-from hermes.pipeline.synthesize import (
+from newsagent.pipeline.search import SearchResult
+from newsagent.pipeline.spec import SectionSpec
+from newsagent.pipeline.sanitizer import sanitize_text
+from newsagent.pipeline.synthesize import (
     _content_word_count,
     build_section_prompt,
     clean_section_text,
@@ -124,7 +124,7 @@ def test_diversity_floor_no_swap_when_already_diverse():
 
 
 def test_source_priority_boost_known_values():
-    from hermes.pipeline.synthesize import source_priority_boost
+    from newsagent.pipeline.synthesize import source_priority_boost
     assert source_priority_boost("arxiv") >= 4
     assert source_priority_boost("openai") >= 5
     assert source_priority_boost("hacker_news") == 1
@@ -303,7 +303,7 @@ Structure:
 
 
 def test_section_rewrite_budget_defaults():
-    from hermes.pipeline.synthesize import SectionRewriteBudget
+    from newsagent.pipeline.synthesize import SectionRewriteBudget
 
     b = SectionRewriteBudget()
     assert b.min_score == 0.5
@@ -311,7 +311,7 @@ def test_section_rewrite_budget_defaults():
 
 
 def test_section_rewrite_budget_explicit_values():
-    from hermes.pipeline.synthesize import SectionRewriteBudget
+    from newsagent.pipeline.synthesize import SectionRewriteBudget
 
     b = SectionRewriteBudget(min_score=0.6, max_iterations=3)
     assert b == SectionRewriteBudget(min_score=0.6, max_iterations=3)
@@ -322,8 +322,8 @@ async def test_section_rewrite_loop_placeholder_when_below_floor(monkeypatch):
     be shipped. The loop must substitute the existing _placeholder(section)
     after exhausting its iteration budget.
     """
-    from hermes.pipeline import synthesize as synth
-    from hermes.pipeline.synthesize import (
+    from newsagent.pipeline import synthesize as synth
+    from newsagent.pipeline.synthesize import (
         SectionRewriteBudget,
         synthesize_section_with_review,
     )
@@ -374,8 +374,8 @@ async def test_section_rewrite_loop_placeholder_when_below_floor(monkeypatch):
 
 async def test_section_rewrite_loop_passes_above_floor(monkeypatch):
     """A section whose final score meets the floor must ship the real prose."""
-    from hermes.pipeline import synthesize as synth
-    from hermes.pipeline.synthesize import (
+    from newsagent.pipeline import synthesize as synth
+    from newsagent.pipeline.synthesize import (
         SectionRewriteBudget,
         synthesize_section_with_review,
     )
@@ -429,7 +429,7 @@ async def test_section_rewrite_loop_passes_above_floor(monkeypatch):
 
 
 def test_placeholder_names_missing_category():
-    from hermes.pipeline.synthesize import _placeholder
+    from newsagent.pipeline.synthesize import _placeholder
 
     sec = SectionSpec(number=6, title="Funding, M&A & Business")
     out = _placeholder(sec, reason="writer emitted planning notes after retry",
@@ -440,7 +440,7 @@ def test_placeholder_names_missing_category():
 
 
 def test_placeholder_default_reason_for_heuristic_provider():
-    from hermes.pipeline.synthesize import _placeholder
+    from newsagent.pipeline.synthesize import _placeholder
 
     sec = SectionSpec(number=1, title="Pulse")
     out = _placeholder(sec)  # no reason → default "no LLM available"

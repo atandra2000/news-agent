@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from hermes.pipeline.planner import plan_queries
-from hermes.pipeline.spec import BriefSpec, SectionSpec
+from newsagent.pipeline.planner import plan_queries
+from newsagent.pipeline.spec import BriefSpec, SectionSpec
 
 
 def _spec(n_sections=3):

@@ -16,7 +16,7 @@ parse_prompt → plan_queries → search (+ collector fallback)
         → assemble_report → archive
 ```
 
-Defined in `hermes/pipeline/orchestrator.py` (`run_news_pipeline`). Every
+Defined in `newsagent/pipeline/orchestrator.py` (`run_news_pipeline`). Every
 stage exchanges structured artifacts (not prompt text). The pipeline is
 flat: no cognition-core detour, no evidence-graph pass, no story editor —
 the per-section synthesizer goes straight from selected sources to prose.
@@ -29,7 +29,7 @@ the per-section synthesizer goes straight from selected sources to prose.
 
 #### 2.1 Parse prompt
 
-**Module:** `hermes/pipeline/spec.py` (`parse_prompt`)
+**Module:** `newsagent/pipeline/spec.py` (`parse_prompt`)
 
 Reads the Markdown prompt file and produces a `BriefSpec`:
 
@@ -56,14 +56,14 @@ class SectionSpec:
 chars of the body for `_CADENCE_HINTS` (`"monthly"`, `"past 30 days"`,
 `"weekly"`, `"past 7 days"`, `"daily"`, `"today"`, …). The first hit
 wins; longer/more specific cadences are checked first. The orchestrator
-prefers `spec.cadence` over `HERMES_CADENCE` so the lookback window
+prefers `spec.cadence` over `NEWSAGENT_CADENCE` so the lookback window
 always matches the prompt body. (The 2026-07-13 monthly report's
 "`past 30 days`" prompt body was previously overridden by a `daily`
 env setting → 24h lookback → empty monthly report.)
 
 #### 2.2 Plan queries
 
-**Module:** `hermes/pipeline/planner.py` (`plan_queries`)
+**Module:** `newsagent/pipeline/planner.py` (`plan_queries`)
 
 Turns each `SectionSpec` into a list of `ResearchQuery`s (section title +
 bullets → focused web search queries, with the per-section source budget
@@ -71,8 +71,8 @@ set by `CadenceSpec`).
 
 #### 2.3 Search
 
-**Modules:** `hermes/pipeline/search.py` (Tavily backend) +
-`hermes/collectors/registry.py` (7 free-collector fallback: HN, Lobsters,
+**Modules:** `newsagent/pipeline/search.py` (Tavily backend) +
+`newsagent/collectors/registry.py` (7 free-collector fallback: HN, Lobsters,
 Dev.to, arXiv, GitHub Releases, Context7, HuggingFace)
 
 ```
@@ -92,7 +92,7 @@ Sources are then **deduped** in two passes:
    if it were 3 independent signals — each repost has a unique
    `item?id=…` URL, so URL-dedup misses them).
 2. `select_relevant` (`synthesize.py`) — per-section keyword ranking
-   + domain cap (`HERMES_SEARCH_DOMAIN_CAP`, default 3) +
+   + domain cap (`NEWSAGENT_SEARCH_DOMAIN_CAP`, default 3) +
    **source-priority boost** (`official_labs=5, research=4, news=2,
    community=1`) + **diversity floor** (`min_source_types=3`) so a
    section cannot be dominated by HN even when 110 arxiv items exist
@@ -100,7 +100,7 @@ Sources are then **deduped** in two passes:
 
 #### 2.4 RAG (past-report retrieval)
 
-**Module:** `hermes/pipeline/retrieval.py`
+**Module:** `newsagent/pipeline/retrieval.py`
 
 Pulls the most recent past reports from storage, embeds their section
 chunks with the configured embedder, and returns top-K similar chunks for
@@ -109,8 +109,8 @@ prompt so the writer can connect to prior coverage.
 
 #### 2.5 Per-section synthesis (parallel + critic loop + CoT backstop)
 
-**Modules:** `hermes/pipeline/synthesize.py` (`synthesize_section_with_review`,
-`extract_prose`) + `hermes/pipeline/coverage.py` (`evaluate_coverage`)
+**Modules:** `newsagent/pipeline/synthesize.py` (`synthesize_section_with_review`,
+`extract_prose`) + `newsagent/pipeline/coverage.py` (`evaluate_coverage`)
 
 For each `SectionSpec` in parallel (bounded by an `asyncio.Semaphore`):
 
@@ -151,7 +151,7 @@ For each `SectionSpec` in parallel (bounded by an `asyncio.Semaphore`):
 
 #### 2.6 Assemble report
 
-**Module:** `hermes/pipeline/report.py` (`assemble_report`)
+**Module:** `newsagent/pipeline/report.py` (`assemble_report`)
 
 Combines the per-section prose into a single Markdown document:
 
@@ -215,12 +215,12 @@ This is the only critic loop — there is no separate post-render pass.
    `rewrite_instructions` + a `score` + `gaps` + `missing_citations`.
 3. On rejection, the synthesizer is called again with the critic's
    instructions appended to the prompt (up to `max_iterations`,
-   default 2; configured by `HERMES_REPORT_MAX_REWRITE_ITERATIONS`).
+   default 2; configured by `NEWSAGENT_REPORT_MAX_REWRITE_ITERATIONS`).
    This lets the loop actually improve a rejected section instead of
    regenerating identical text.
 4. If the loop exhausts its budget and the final critic score is still
    below `min_section_score` (default 0.5, configured by
-   `HERMES_REPORT_MIN_SECTION_SCORE`), the section is replaced with the
+   `NEWSAGENT_REPORT_MIN_SECTION_SCORE`), the section is replaced with the
    standard `_placeholder(section)` and logged as
    `brief.section_below_floor`. A sub-threshold draft can no longer ship.
 
@@ -232,9 +232,9 @@ section-scoped.)
 
 ## 4. Quality self-assessment
 
-**Module:** `hermes/pipeline/quality.py`
+**Module:** `newsagent/pipeline/quality.py`
 
-Separate CLI command: `hermes quality [--date YYYY-MM-DD]`.
+Separate CLI command: `newsagent quality [--date YYYY-MM-DD]`.
 
 1. Reads the day's report from `storage/reports/YYYY-MM-DD.md`.
 2. **LLM judge** — scores the report on 6 dimensions (1-5):
@@ -281,7 +281,7 @@ completed.
 
 ## 7. Profiles
 
-Profiles (`hermes/profiles.py`) parameterize the pipeline without code changes:
+Profiles (`newsagent/profiles.py`) parameterize the pipeline without code changes:
 
 ```python
 PROFILES = {
@@ -298,7 +298,7 @@ A profile overrides:
 - `settings.pipeline.top_k_analysis`
 - `settings.pipeline.report_top_k`
 
-Cadence is set via `HERMES_CADENCE` in `.env` (not via profile). When
+Cadence is set via `NEWSAGENT_CADENCE` in `.env` (not via profile). When
 the prompt body contains its own cadence hint (e.g. "the past 30
 days"), `spec.cadence` takes precedence over the env (see §2.1).
 

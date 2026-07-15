@@ -10,9 +10,9 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-from hermes.collectors.base import RawItem
-from hermes.config import HermesSettings
-from hermes.llm.router import LLMRouter
+from newsagent.collectors.base import RawItem
+from newsagent.config import NewsAgentSettings
+from newsagent.llm.router import LLMRouter
 
 
 class FakeRouter(LLMRouter):
@@ -183,8 +183,8 @@ class _FakeResult:
         return self.prompt_tokens + self.completion_tokens
 
 
-def _settings(tmp_path) -> HermesSettings:
-    s = HermesSettings()
+def _settings(tmp_path) -> NewsAgentSettings:
+    s = NewsAgentSettings()
     s.storage.dir = tmp_path
     s.embed.model = "hashing"
     s.embed.dim = 256

@@ -1,9 +1,9 @@
-# Hermes — Pipeline Unification Design
+# newsagent — Pipeline Unification Design
 
 **Date:** 2026-07-13
 **Status:** Approved
 **Author:** Atandra Bharati (with Claude)
-**Objective:** Replace the two-pipeline structure (`hermes run` daily + `hermes news` brief) with a single, brief-driven pipeline. The cognition core (artifact-passing 14 stages in `pipeline/stages/`) becomes the body of the brief path. All legacy/fallback code is deleted. One command, one pipeline, one file.
+**Objective:** Replace the two-pipeline structure (`newsagent run` daily + `newsagent news` brief) with a single, brief-driven pipeline. The cognition core (artifact-passing 14 stages in `pipeline/stages/`) becomes the body of the brief path. All legacy/fallback code is deleted. One command, one pipeline, one file.
 
 ---
 
@@ -13,18 +13,18 @@
 
 | Command | Purpose |
 |---|---|
-| `hermes news <prompt.md>` | The one production command. Reads the prompt, runs the unified pipeline, writes `<prompt-slug>.md`. **Required** arg is the prompt file. |
-| `hermes status` | DB stats (items, reports, evals). Unchanged. |
-| `hermes sources` | List registered + enabled collectors. Unchanged. |
-| `hermes models` | List models on the live endpoint. Unchanged. |
-| `hermes profiles` | List report profiles. CLI shape unchanged; content rebuilt. |
-| `hermes eval <report.md> --prompt <prompt.md>` | Score a past report. Unchanged. |
-| `hermes quality [--date YYYY-MM-DD]` | Self-assess a report. Unchanged. |
-| `hermes help` | Usage. Unchanged. |
+| `newsagent news <prompt.md>` | The one production command. Reads the prompt, runs the unified pipeline, writes `<prompt-slug>.md`. **Required** arg is the prompt file. |
+| `newsagent status` | DB stats (items, reports, evals). Unchanged. |
+| `newsagent sources` | List registered + enabled collectors. Unchanged. |
+| `newsagent models` | List models on the live endpoint. Unchanged. |
+| `newsagent profiles` | List report profiles. CLI shape unchanged; content rebuilt. |
+| `newsagent eval <report.md> --prompt <prompt.md>` | Score a past report. Unchanged. |
+| `newsagent quality [--date YYYY-MM-DD]` | Self-assess a report. Unchanged. |
+| `newsagent help` | Usage. Unchanged. |
 
-**Removed subcommands:** `hermes run`, `hermes backfill`, `hermes research`.
+**Removed subcommands:** `newsagent run`, `newsagent backfill`, `newsagent research`.
 
-**Removed flags from `hermes news`:** `--daily`, `--weekly`, `--monthly`, `--rate`, `--queries-per-section`, `--source-queries`. Cadence comes from `.env` only.
+**Removed flags from `newsagent news`:** `--daily`, `--weekly`, `--monthly`, `--rate`, `--queries-per-section`, `--source-queries`. Cadence comes from `.env` only.
 
 **Required argument:** `<prompt.md>`. The 9 prompts in `prompts/` become the user-editable inputs. The `example_prompt.md` in the repo root is the canonical example.
 
@@ -34,7 +34,7 @@ One file: `storage/reports/<brief-slug>.md` where slug is the prompt's first H1 
 
 ### 1.3 Backward compatibility
 
-None for the removed subcommands. The `hermes run` launchd plist is updated to call `hermes news <path-to-prompt>`.
+None for the removed subcommands. The `newsagent run` launchd plist is updated to call `newsagent news <path-to-prompt>`.
 
 ---
 
@@ -42,25 +42,25 @@ None for the removed subcommands. The `hermes run` launchd plist is updated to c
 
 ### 2.1 One orchestrator
 
-**`src/hermes/pipeline/run.py`** is the orchestrator (replaces the current daily path's run.py; the brief's `brief/run.py` is deleted). The brief path's machinery moves into `pipeline/` so the cognition core can call it.
+**`src/newsagent/pipeline/run.py`** is the orchestrator (replaces the current daily path's run.py; the brief's `brief/run.py` is deleted). The brief path's machinery moves into `pipeline/` so the cognition core can call it.
 
 ### 2.2 Module map after unification
 
 | Module | Role | Source |
 |---|---|---|
-| `hermes.pipeline.run` | The orchestrator | Renamed brief orchestrator |
-| `hermes.pipeline.spec` | `parse_prompt(md) -> BriefSpec` | Moved from `brief/spec.py` |
-| `hermes.pipeline.planner` | `plan_queries` | Moved from `brief/planner.py` |
-| `hermes.pipeline.search` | Tavily + 7-collector fallback | Moved from `brief/search.py` + `brief/run.py:_gather_sources_fallback` |
-| `hermes.pipeline.retrieval` | RAG over past reports | Already in `pipeline/retrieval.py` |
-| `hermes.pipeline.synthesize` | Per-section synthesis w/ critic loop | Moved from `brief/synthesize.py` |
-| `hermes.pipeline.report` | Citation resolution + assembly | Moved from `brief/report.py` |
-| `hermes.pipeline.eval` | Report scoring | Moved from `brief/eval.py` |
-| `hermes.pipeline.adapter` | Per-prompt adaptive state | Moved from `brief/adapter.py` |
-| `hermes.pipeline.stages.*` | The 14 cognition core stages | Unchanged |
-| `hermes.cli` | Entry points | Pruned (8 → 7 subcommands) |
-| `hermes.config` | Settings | Pruned (see §5) |
-| `hermes.storage.*` | Persistence | KG writes dropped (see §3) |
+| `newsagent.pipeline.run` | The orchestrator | Renamed brief orchestrator |
+| `newsagent.pipeline.spec` | `parse_prompt(md) -> BriefSpec` | Moved from `brief/spec.py` |
+| `newsagent.pipeline.planner` | `plan_queries` | Moved from `brief/planner.py` |
+| `newsagent.pipeline.search` | Tavily + 7-collector fallback | Moved from `brief/search.py` + `brief/run.py:_gather_sources_fallback` |
+| `newsagent.pipeline.retrieval` | RAG over past reports | Already in `pipeline/retrieval.py` |
+| `newsagent.pipeline.synthesize` | Per-section synthesis w/ critic loop | Moved from `brief/synthesize.py` |
+| `newsagent.pipeline.report` | Citation resolution + assembly | Moved from `brief/report.py` |
+| `newsagent.pipeline.eval` | Report scoring | Moved from `brief/eval.py` |
+| `newsagent.pipeline.adapter` | Per-prompt adaptive state | Moved from `brief/adapter.py` |
+| `newsagent.pipeline.stages.*` | The 14 cognition core stages | Unchanged |
+| `newsagent.cli` | Entry points | Pruned (8 → 7 subcommands) |
+| `newsagent.config` | Settings | Pruned (see §5) |
+| `newsagent.storage.*` | Persistence | KG writes dropped (see §3) |
 
 ### 2.3 Orchestrator flow
 
@@ -92,7 +92,7 @@ FULL_COGNITION_MIN_SECTIONS = 3   # brief must have at least 3 sections to use t
 
 ### 2.4 The cognition core is unchanged
 
-The 14 stages in `hermes/pipeline/stages/` stay as-is. They were built artifact-passing (no behavior change). They become the optional body of the unified pipeline.
+The 14 stages in `newsagent/pipeline/stages/` stay as-is. They were built artifact-passing (no behavior change). They become the optional body of the unified pipeline.
 
 ### 2.5 No KG writes
 
@@ -105,10 +105,10 @@ The 14 stages in `hermes/pipeline/stages/` stay as-is. They were built artifact-
 ### 3.1 Inputs to the orchestrator
 
 1. `BriefSpec` from `parse_prompt(md)` — title, sections, bullets, deliverables, quality, instructions
-2. `HermesSettings` from `.env` — `HERMES_CADENCE`, `HERMES_SEARCH_BACKEND`, LLM/embed/storage/collector settings
+2. `NewsAgentSettings` from `.env` — `NEWSAGENT_CADENCE`, `NEWSAGENT_SEARCH_BACKEND`, LLM/embed/storage/collector settings
 3. `RunContext` (built once) — store, router, embedder, vectorstore
 
-### 3.2 Stage outputs (typed dataclasses in `hermes/pipeline/models.py`)
+### 3.2 Stage outputs (typed dataclasses in `newsagent/pipeline/models.py`)
 
 | Stage | Output | Used by |
 |---|---|---|
@@ -146,7 +146,7 @@ The 14 stages in `hermes/pipeline/stages/` stay as-is. They were built artifact-
 | Failure | Behavior |
 |---|---|
 | Prompt file missing | CLI exits 1 with clear message; no LLM call |
-| `HERMES_CADENCE` unset | Default to `daily`; invalid value exits 1 |
+| `NEWSAGENT_CADENCE` unset | Default to `daily`; invalid value exits 1 |
 | Tavily returns empty (HTTP 432, no key, quota) | Run 7-collector fallback (`arxiv`, `hacker_news`, `github_trending`, `huggingface`, `semantic_scholar`, `devto`, `lobsters`); synthesize sections from those |
 | All collectors also return empty | One section per prompt spec gets a "no sources today" placeholder; rest continues |
 | LLM call fails on role X | Router walks fallback chain → if all fail, heuristic fallback (empty `ProviderResult`); section synthesis catches and emits placeholder |
@@ -212,7 +212,7 @@ extra_queries: int = 2
 
 ### 5.3 Cadence
 
-`HERMES_CADENCE` env var (new, lives on `HermesSettings`):
+`NEWSAGENT_CADENCE` env var (new, lives on `NewsAgentSettings`):
 - `daily` (default), `weekly`, `monthly`
 - Drives the `_CADENCE` table lookup
 - Validated to one of the three values
@@ -223,15 +223,15 @@ The brief path's `_CADENCE` table (window, days, per-section, sources, max_token
 
 After the cleanup, no code reads:
 
-- `HERMES_PIPELINE_SELF_CRITIQUE`
-- `HERMES_PIPELINE_RAG_WRITING`
-- `HERMES_PIPELINE_RESEARCH_LOOPS`
-- `HERMES_PIPELINE_CRITIC_MAX_CHARS`
-- `HERMES_PIPELINE_ANALYZE_MAX_CHARS`
-- `HERMES_PIPELINE_PRIORITIZER_*`
-- `HERMES_SEARCH_MAX_RESULTS`, `HERMES_SEARCH_SEARCH_DEPTH`, `HERMES_SEARCH_TOPIC`, `HERMES_SEARCH_INCLUDE_RAW_CONTENT`, `HERMES_SEARCH_MAX_SOURCES`, `HERMES_SEARCH_PER_SECTION_SOURCES`
+- `NEWSAGENT_PIPELINE_SELF_CRITIQUE`
+- `NEWSAGENT_PIPELINE_RAG_WRITING`
+- `NEWSAGENT_PIPELINE_RESEARCH_LOOPS`
+- `NEWSAGENT_PIPELINE_CRITIC_MAX_CHARS`
+- `NEWSAGENT_PIPELINE_ANALYZE_MAX_CHARS`
+- `NEWSAGENT_PIPELINE_PRIORITIZER_*`
+- `NEWSAGENT_SEARCH_MAX_RESULTS`, `NEWSAGENT_SEARCH_SEARCH_DEPTH`, `NEWSAGENT_SEARCH_TOPIC`, `NEWSAGENT_SEARCH_INCLUDE_RAW_CONTENT`, `NEWSAGENT_SEARCH_MAX_SOURCES`, `NEWSAGENT_SEARCH_PER_SECTION_SOURCES`
 
-### 5.5 `HERMES_COLLECTORS_ENABLED` stays the same
+### 5.5 `NEWSAGENT_COLLECTORS_ENABLED` stays the same
 
 The 15 collectors (or whatever subset the user enables) are still the source of items + the fallback when Tavily is off.
 
@@ -241,13 +241,13 @@ The 15 collectors (or whatever subset the user enables) are still the source of 
 
 ### 6.1 Whole files/directories
 
-- `src/hermes/brief/` — entire package (moved to `pipeline/`)
-- `src/hermes/analyzers/` — legacy, never on the primary path
-- `src/hermes/renderers/` — 18 classes, never on the primary path
-- `src/hermes/pipeline/cluster.py`
-- `src/hermes/pipeline/rank.py`
-- `src/hermes/pipeline/planning.py`
-- `src/hermes/pipeline/research.py`
+- `src/newsagent/brief/` — entire package (moved to `pipeline/`)
+- `src/newsagent/analyzers/` — legacy, never on the primary path
+- `src/newsagent/renderers/` — 18 classes, never on the primary path
+- `src/newsagent/pipeline/cluster.py`
+- `src/newsagent/pipeline/rank.py`
+- `src/newsagent/pipeline/planning.py`
+- `src/newsagent/pipeline/research.py`
 
 ### 6.2 Functions / classes to delete
 
@@ -282,7 +282,7 @@ The 15 collectors (or whatever subset the user enables) are still the source of 
 - `docs/ARCHITECTURE.md` — rewrite §1, §2.6, §2.7 (delete renderers), §2.8 (collapse brief)
 - `docs/PIPELINE.md` — rewrite §1, §2, §3, §4, §6; delete §5 (RAG legacy), §6 (research loops flag)
 - `docs/BRIEF.md` — delete (content moves to `PIPELINE.md` and `CONFIGURATION.md`)
-- `docs/HERMES_DESIGN.md` — leave as-is (historical design doc)
+- `docs/NEWSAGENT_DESIGN.md` — leave as-is (historical design doc)
 - `docs/COGNITION_DESIGN.md` — leave as-is
 - `docs/STORAGE.md` — note that KG tables are no longer written
 - `docs/CONFIGURATION.md` — rewrite to reflect removed env vars
@@ -292,7 +292,7 @@ The 15 collectors (or whatever subset the user enables) are still the source of 
 
 ### 6.5 Scheduler templates
 
-- `scheduler/launchd.plist` — change `hermes run` to `hermes news <path-to-prompt>`
+- `scheduler/launchd.plist` — change `newsagent run` to `newsagent news <path-to-prompt>`
 - `scheduler/cron.txt` — same
 - `scheduler/systemd.{service,timer}` — same
 
@@ -340,7 +340,7 @@ The 15 collectors (or whatever subset the user enables) are still the source of 
 Each step keeps tests green:
 
 1. **Move (no behavior change).** Move `brief/spec.py` → `pipeline/spec.py`, `brief/planner.py` → `pipeline/planner.py`, `brief/search.py` → `pipeline/search.py`, `brief/synthesize.py` → `pipeline/synthesize.py`, `brief/report.py` → `pipeline/report.py`, `brief/eval.py` → `pipeline/eval.py`, `brief/adapter.py` → `pipeline/adapter.py`. Update internal imports. All 263 tests pass.
-2. **Add `HERMES_CADENCE` to `HermesSettings`.** Wire it into the brief orchestrator (replacing the `cadence` parameter). Tests pass.
+2. **Add `NEWSAGENT_CADENCE` to `NewsAgentSettings`.** Wire it into the brief orchestrator (replacing the `cadence` parameter). Tests pass.
 3. **Slim `PipelineConfig` and `SearchConfig`.** Remove dead flags. Tests pass.
 4. **Replace `pipeline/run.py` with the new orchestrator.** It imports the moved brief modules + the cognition core stages. The old `pipeline/run.py` is deleted in step 6; during step 4 it lives as a temporary shim that calls into the new orchestrator. Test the new orchestrator end-to-end.
 5. **Update `cli.py`.** Remove the 4 dead subcommands; update flags. Tests pass.
@@ -364,13 +364,13 @@ Each step keeps tests green:
 
 ## 10. Acceptance criteria
 
-- `hermes news <prompt.md>` produces the same kind of report the brief path produces today (e.g. `ai-state-of-the-industry-monthly.md`).
-- `hermes run` and `hermes backfill` and `hermes research` are gone.
+- `newsagent news <prompt.md>` produces the same kind of report the brief path produces today (e.g. `ai-state-of-the-industry-monthly.md`).
+- `newsagent run` and `newsagent backfill` and `newsagent research` are gone.
 - The cognition core stages are wired into the brief path (today they're dead in the daily path).
 - 250-280 tests pass, all offline, all in <10s.
 - `ruff check src tests` is clean.
 - The 9 prompts in `prompts/` continue to work as inputs.
-- The launchd plist runs `hermes news <prompt.md>` once a day.
+- The launchd plist runs `newsagent news <prompt.md>` once a day.
 - No code reads the removed env vars.
-- No file in `src/hermes/brief/`, `src/hermes/analyzers/`, or `src/hermes/renderers/` remains.
-- No file in `src/hermes/pipeline/{cluster,rank,planning,research,quality_gates,prioritize,run}.py` remains.
+- No file in `src/newsagent/brief/`, `src/newsagent/analyzers/`, or `src/newsagent/renderers/` remains.
+- No file in `src/newsagent/pipeline/{cluster,rank,planning,research,quality_gates,prioritize,run}.py` remains.

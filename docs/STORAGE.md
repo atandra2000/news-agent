@@ -7,10 +7,10 @@
 
 ## 1. SQLite — one file, zero infra
 
-Hermes uses a single SQLite file (default: `storage/hermes.db`) accessed via
+newsagent uses a single SQLite file (default: `storage/newsagent.db`) accessed via
 SQLAlchemy async + aiosqlite. No Postgres, no Alembic, no DB server.
 
-**Engine:** `hermes/storage/db.py: make_engine()` →
+**Engine:** `newsagent/storage/db.py: make_engine()` →
 `create_async_engine("sqlite+aiosqlite:///<path>")`
 
 **Schema creation:** `create_schema()` runs `Base.metadata.create_all` then
@@ -21,7 +21,7 @@ SQLAlchemy async + aiosqlite. No Postgres, no Alembic, no DB server.
 When new columns are added to a model, `_add_missing_columns()` introspects
 the existing schema and runs `ALTER TABLE ... ADD COLUMN` for any missing
 columns. This means existing databases are upgraded in-place on the next
-`hermes news` without manual migration scripts.
+`newsagent news` without manual migration scripts.
 
 ```python
 async def _add_missing_columns(engine):
@@ -57,12 +57,12 @@ The 18 tables fall into two groups:
   `vectors`, `reports`, `report_evals`, `lessons`. The unified pipeline
   writes `items` / `item_aliases` / `vectors` during the search→synthesis
   pass, `reports` + `lessons` from the orchestrator / quality stage;
-  `hermes eval` writes `report_evals`. The `trend_snapshots` table is
+  `newsagent eval` writes `report_evals`. The `trend_snapshots` table is
   defined but no longer written (`pipeline/trend.py` was removed during
   the unification) — keep the schema entry for forward-compatibility.
 - **Legacy (not written by the pipeline):** `analyses`, `clusters`,
   `research_plans`, `claims`, `evidence`, `evidence_relationships`. These
-  belong to the older `hermes.analyzers` / Research-Intelligence path. They
+  belong to the older `newsagent.analyzers` / Research-Intelligence path. They
   remain in the schema for forward-compatibility and are safe to ignore when
   reasoning about the pipeline. The KG tables (`entities`, `relationships`,
   `entity_aliases`, `entity_history`, `timelines`) are documented separately
@@ -104,7 +104,7 @@ Near-duplicate URL mappings.
 | `canonical_uid` | String(64), indexed |
 
 #### `analyses`  *(legacy — not written by the pipeline)*
-Typed LLM analyses (older `hermes.analyzers` path). Idempotent by `(item_uid, analyzer_version)`.
+Typed LLM analyses (older `newsagent.analyzers` path). Idempotent by `(item_uid, analyzer_version)`.
 
 | Column | Type | Notes |
 |--------|------|-------|
@@ -344,14 +344,14 @@ Materialized timeline entries for fast temporal queries.
 
 ## 3. Vector store
 
-**Module:** `hermes/storage/vectorstore.py`
+**Module:** `newsagent/storage/vectorstore.py`
 
 `VectorStore` protocol with two implementations:
 
 | Backend | Config | When to use |
 |---------|--------|-------------|
-| `numpy` (default) | `HERMES_STORAGE_VECTOR_BACKEND=numpy` | <100K items, zero-dep, brute-force cosine |
-| `qdrant` (embedded) | `HERMES_STORAGE_VECTOR_BACKEND=qdrant` | Larger corpora, HNSW index |
+| `numpy` (default) | `NEWSAGENT_STORAGE_VECTOR_BACKEND=numpy` | <100K items, zero-dep, brute-force cosine |
+| `qdrant` (embedded) | `NEWSAGENT_STORAGE_VECTOR_BACKEND=qdrant` | Larger corpora, HNSW index |
 
 Both persist vectors to disk (numpy: SQLite `vectors` table; Qdrant: local
 on-disk at `storage/vectors/`).
@@ -368,7 +368,7 @@ class VectorStore(abc.ABC):
 
 ## 4. Knowledge graph
 
-**Module:** `hermes/storage/kg.py`
+**Module:** `newsagent/storage/kg.py`
 
 Query helpers over the `entities` and `relationships` tables:
 
@@ -376,6 +376,6 @@ Query helpers over the `entities` and `relationships` tables:
 - `relations_for(ctx, entity_name)` — all relationships involving an entity.
 
 The KG tables (`entities`, `relationships`, `entity_aliases`, `entity_history`,
-`timelines`) are populated by the legacy `hermes.analyzers` / Research-Intelligence
+`timelines`) are populated by the legacy `newsagent.analyzers` / Research-Intelligence
 path, **not** by the daily pipeline. `search_entities` / `relations_for` remain
 available as query helpers over whatever data is present.

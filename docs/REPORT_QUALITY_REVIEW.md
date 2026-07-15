@@ -5,7 +5,7 @@
 > and found 10 distinct defects. All 10 have since been implemented and
 > verified (237/237 tests, ruff clean).
 
-This document exists so the next person reading `src/hermes/pipeline/`
+This document exists so the next person reading `src/newsagent/pipeline/`
 knows **why** each defensive check exists — not just what it does. Each
 scope section is named, scoped, links the failing output, names the
 minimum change, and references the test that pins it down.
@@ -35,7 +35,7 @@ minimum change, and references the test that pins it down.
 
 **Symptom.** The prompt body says "monthly industry brief — past 30 days",
 but the rendered report contained only same-day news (Hacker News stories
-posted within hours). `HERMES_CADENCE` was unset / set to `daily`, and the
+posted within hours). `NEWSAGENT_CADENCE` was unset / set to `daily`, and the
 prompt body was ignored.
 
 **Root cause.** `run_news_pipeline` resolved cadence from `settings.cadence`
@@ -238,7 +238,7 @@ All 9 implementation scopes verified:
 - **237/237 tests pass** (baseline was 191; +46 net new tests)
 - **Ruff clean** (`ruff check src/ tests/`)
 - **DB migration verified** — `duplication_collapse_rate FLOAT` column
-  added to existing `storage/hermes.db` by `_add_missing_columns()`
+  added to existing `storage/newsagent.db` by `_add_missing_columns()`
   without manual intervention
 - **All 4 example brief cadences** still produce valid reports (daily,
   weekly, monthly)
@@ -286,12 +286,12 @@ If the next monthly run with these fixes had been the 2026-07-13 one:
 ## 5. Files changed
 
 ```
-src/hermes/pipeline/coverage.py          (NEW, 193 lines)
-src/hermes/pipeline/spec.py              (+31,  cadence detection)
-src/hermes/pipeline/orchestrator.py      (+127, cadence precedence, observability, coverage short-circuit, cross-post dedup, manifest)
-src/hermes/pipeline/sanitizer.py         (+55,  ~30 new banned phrases + is_synthesis_failure_stub)
-src/hermes/pipeline/report.py            (+183, citation audit, deliverables gate, thin banner, stub detection)
-src/hermes/pipeline/search.py            (+66,  content_fingerprint, dedup_sources_with_cross_posts, duplication_collapse_rate)
-src/hermes/pipeline/synthesize.py        (+97,  source-priority boost, diversity floor, unsourced-marker prompt)
-src/hermes/storage/models.py             (+3,   duplication_collapse_rate Float column)
+src/newsagent/pipeline/coverage.py          (NEW, 193 lines)
+src/newsagent/pipeline/spec.py              (+31,  cadence detection)
+src/newsagent/pipeline/orchestrator.py      (+127, cadence precedence, observability, coverage short-circuit, cross-post dedup, manifest)
+src/newsagent/pipeline/sanitizer.py         (+55,  ~30 new banned phrases + is_synthesis_failure_stub)
+src/newsagent/pipeline/report.py            (+183, citation audit, deliverables gate, thin banner, stub detection)
+src/newsagent/pipeline/search.py            (+66,  content_fingerprint, dedup_sources_with_cross_posts, duplication_collapse_rate)
+src/newsagent/pipeline/synthesize.py        (+97,  source-priority boost, diversity floor, unsourced-marker prompt)
+src/newsagent/storage/models.py             (+3,   duplication_collapse_rate Float column)
 ```

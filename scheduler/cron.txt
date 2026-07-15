@@ -1,6 +1,6 @@
 # Crontab reference (alternative to launchd/systemd).
-# Run Hermes daily at 06:00, logging to storage/hermes.log:
-#   0 6 * * * cd /path/to/hermes && HERMES_CADENCE=daily .venv/bin/python -m hermes news prompts/ai_news_daily.md >> storage/hermes.log 2>&1
+# Run newsagent daily at 06:00, logging to storage/newsagent.log:
+#   0 6 * * * cd /path/to/newsagent && NEWSAGENT_CADENCE=daily .venv/bin/python -m newsagent news prompts/ai_news_daily.md >> storage/newsagent.log 2>&1
 
 # Weekly deep-dive (Sundays at 06:30) — use a different prompt + cadence:
-#   30 6 * * 0 cd /path/to/hermes && HERMES_CADENCE=weekly .venv/bin/python -m hermes news prompts/ai_news_weekly.md >> storage/hermes.weekly.log 2>&1
+#   30 6 * * 0 cd /path/to/newsagent && NEWSAGENT_CADENCE=weekly .venv/bin/python -m newsagent news prompts/ai_news_weekly.md >> storage/newsagent.weekly.log 2>&1

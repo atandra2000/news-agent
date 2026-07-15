@@ -9,10 +9,10 @@ from datetime import datetime, timezone
 import pytest
 import structlog
 
-from hermes.llm.embed import Embedder
-from hermes.pipeline.context import RunContext
-from hermes.storage.db import Store
-from hermes.storage.vectorstore import build_vector_store
+from newsagent.llm.embed import Embedder
+from newsagent.pipeline.context import RunContext
+from newsagent.storage.db import Store
+from newsagent.storage.vectorstore import build_vector_store
 from tests.helpers import FakeRouter, _settings
 
 

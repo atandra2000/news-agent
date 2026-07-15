@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from hermes.pipeline.orchestrator import _gather_sources_fallback
+from newsagent.pipeline.orchestrator import _gather_sources_fallback
 
 
 class _FakeItem:
@@ -37,7 +37,7 @@ async def test_fallback_returns_three_tuple(monkeypatch):
     _resolve_fallback_collectors to a 3-collector stub — the *shape* of the
     return value is what we care about here, not the breadth of fan-out.
     """
-    from hermes.pipeline import orchestrator
+    from newsagent.pipeline import orchestrator
 
     monkeypatch.setattr(orchestrator, "_resolve_fallback_collectors", lambda: ("arxiv", "hacker_news", "devto"))
     out, checked, failed = await _gather_sources_fallback(
@@ -51,8 +51,8 @@ async def test_fallback_returns_three_tuple(monkeypatch):
 
 async def test_fallback_records_collector_outcomes(monkeypatch):
     """A failing collector is recorded in `failed`; a successful one in `checked`."""
-    from hermes.pipeline import orchestrator
-    from hermes.collectors import registry
+    from newsagent.pipeline import orchestrator
+    from newsagent.collectors import registry
 
     good_item = _FakeItem(url="https://arxiv.org/abs/1", source_type="arxiv")
 

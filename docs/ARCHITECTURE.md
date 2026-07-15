@@ -1,13 +1,13 @@
 # Architecture
 
-> System architecture, module map, data flow, and component contracts for Hermes.
+> System architecture, module map, data flow, and component contracts for newsagent.
 
 ---
 
 ## 1. High-level data flow
 
 ```
-                          hermes news <prompt.md>
+                          newsagent news <prompt.md>
                                        │
    ┌── PARSE PROMPT ────────┴──────────────────┐
    │  pipeline/spec.py: parse_prompt(md) →      │
@@ -43,7 +43,7 @@
 
 ## 2. Module responsibilities
 
-### 2.1 `hermes.collectors` — Source plugins
+### 2.1 `newsagent.collectors` — Source plugins
 
 **Contract:** `CollectorAdapter.collect(since, limit) -> list[RawItem]`.
 
@@ -75,14 +75,14 @@ and `reddit` modules exist but are **excluded from the registry by design**
 Context7, GitHub Releases, Dev.to, and Lobsters. To add a collector: see
 [COLLECTORS.md](./COLLECTORS.md).
 
-### 2.2 `hermes.dedup` — Deduplication
+### 2.2 `newsagent.dedup` — Deduplication
 
 - **`simhash(text) -> int`** — 64-bit SimHash from token bigrams.
 - **`Deduper`** — in-memory `{simhash: uid}` registry with Hamming-distance
   near-dup check. Seeded from existing canonical items' SimHashes at ingest start.
 - Near-duplicates become `ItemAlias` rows, not re-analyzed.
 
-### 2.3 `hermes.llm` — LLM layer
+### 2.3 `newsagent.llm` — LLM layer
 
 ```
 catalog.py          → tier → model chain (OLLAMA_CATALOG, OPENCODE_GO_CATALOG)
@@ -100,7 +100,7 @@ prompts/            → Jinja2 templates
 
 For provider wiring details: see [LLM_PROVIDERS.md](./LLM_PROVIDERS.md).
 
-### 2.6 `hermes.pipeline` — The unified pipeline
+### 2.6 `newsagent.pipeline` — The unified pipeline
 
 Orchestrated by `run_news_pipeline()` in `pipeline/orchestrator.py`. Every
 stage passes structured artifacts (not prompt text). The pipeline has a
@@ -118,13 +118,13 @@ single phase — the brief path — that runs for every prompt.
 | | **archive** | `pipeline/orchestrator.py` | `Report` row |
 
 Cadence is read once at the top of the orchestrator from
-`settings.cadence` (env: `HERMES_CADENCE=daily|weekly|monthly`) and yields a
+`settings.cadence` (env: `NEWSAGENT_CADENCE=daily|weekly|monthly`) and yields a
 `CadenceSpec` that drives the lookback window, per-section source count,
 citation thresholds, and synthesis budget.
 
 The brief spec format, search/backfill behavior, citation resolution, eval,
 and adaptive adapter are part of the same orchestrator — they used to live
-in the `hermes/brief/` package and have moved into `hermes/pipeline/`:
+in the `newsagent/brief/` package and have moved into `newsagent/pipeline/`:
 
 | Module (was) | Module (now) | Job |
 |--------------|--------------|-----|
@@ -139,7 +139,7 @@ in the `hermes/brief/` package and have moved into `hermes/pipeline/`:
 
 Stage details: [PIPELINE.md](./PIPELINE.md).
 
-### 2.7 `hermes.storage` — Persistence
+### 2.7 `newsagent.storage` — Persistence
 
 | Module | Role |
 |--------|------|
@@ -150,23 +150,23 @@ Stage details: [PIPELINE.md](./PIPELINE.md).
 
 Schema details: [STORAGE.md](./STORAGE.md).
 
-### 2.8 `hermes.output` — Sinks
+### 2.8 `newsagent.output` — Sinks
 
 | Sink | Delivery |
 |------|----------|
 | `MarkdownFileSink` | `storage/reports/YYYY-MM-DD.md` (canonical) |
-| `ObsidianSink` | `<vault>/Hermes_YYYY-MM-DD.md` with frontmatter + tags |
+| `ObsidianSink` | `<vault>/newsagent_YYYY-MM-DD.md` with frontmatter + tags |
 
 `build_sinks(settings)` returns the active sink list based on whether
-`HERMES_STORAGE_OBSIDIAN_VAULT` is set.
+`NEWSAGENT_STORAGE_OBSIDIAN_VAULT` is set.
 
-### 2.9 `hermes.config` — Settings
+### 2.9 `newsagent.config` — Settings
 
-Pydantic settings with `HERMES_` env prefix. Groups: `collectors`, `llm`,
+Pydantic settings with `NEWSAGENT_` env prefix. Groups: `collectors`, `llm`,
 `embed`, `pipeline`, `storage`, `search`, `rag`, `cadence`. See
 [CONFIGURATION.md](./CONFIGURATION.md).
 
-### 2.10 `hermes.profiles` — Report profiles
+### 2.10 `newsagent.profiles` — Report profiles
 
 | Profile | top_k_analysis | depth | description |
 |---------|----------------|-------|-------------|
@@ -180,17 +180,17 @@ Profiles still carry a `sections` list, but the unified pipeline builds a
 **dynamic** report from the parsed brief — that column does not constrain
 the output.
 
-### 2.11 `hermes.cli` — Entry points
+### 2.11 `newsagent.cli` — Entry points
 
 | Command | What it does |
 |---------|---------------|
-| `hermes news <prompt.md>` | The unified brief pipeline: collect → search → synthesize → render → archive |
-| `hermes eval <report.md> --prompt <prompt.md> [--cadence] [--rate 1-5]` | Evaluate a brief report / record user feedback |
-| `hermes status` | Show DB stats: items, reports, evals |
-| `hermes sources` | List registered + enabled collectors |
-| `hermes models` | List models on the live endpoint + catalog check |
-| `hermes profiles` | List available report profiles |
-| `hermes quality [--date]` | Self-assess a report on 6 quality dimensions |
+| `newsagent news <prompt.md>` | The unified brief pipeline: collect → search → synthesize → render → archive |
+| `newsagent eval <report.md> --prompt <prompt.md> [--cadence] [--rate 1-5]` | Evaluate a brief report / record user feedback |
+| `newsagent status` | Show DB stats: items, reports, evals |
+| `newsagent sources` | List registered + enabled collectors |
+| `newsagent models` | List models on the live endpoint + catalog check |
+| `newsagent profiles` | List available report profiles |
+| `newsagent quality [--date]` | Self-assess a report on 6 quality dimensions |
 
 CLI details: [CLI.md](./CLI.md).
 
@@ -201,7 +201,7 @@ CLI details: [CLI.md](./CLI.md).
 ```python
 @dataclass
 class RunContext:
-    settings: HermesSettings
+    settings: NewsAgentSettings
     store: Store
     router: LLMRouter
     embedder: Embedder
@@ -243,12 +243,12 @@ missing columns on startup.
 
 ### Why numpy vectors over Qdrant server?
 Brute-force cosine over <100K 768-d vectors is <50ms on an M2. Qdrant-embedded
-(local mode, no server) is available via `HERMES_STORAGE_VECTOR_BACKEND=qdrant`
+(local mode, no server) is available via `NEWSAGENT_STORAGE_VECTOR_BACKEND=qdrant`
 for larger corpora.
 
 ### Why a one-shot CLI over a daemon?
 A research report doesn't need a long-running process. `launchd` (macOS) or
-`systemd` (Linux) invokes `hermes news <prompt.md>` once a day. No broker
+`systemd` (Linux) invokes `newsagent news <prompt.md>` once a day. No broker
 (Celery/Redis), no worker crashes, no memory leaks across days.
 
 ### Why role-routed models instead of one big model?
@@ -257,7 +257,7 @@ research) use a capable writer model. This avoids paying reasoning-token
 overhead on 64-token label tasks. See [LLM_PROVIDERS.md](./LLM_PROVIDERS.md).
 
 ### Why a single dynamic report instead of 18 fixed renderers?
-The previous 18-section `hermes/renderers` system forced every report into the
+The previous 18-section `newsagent/renderers` system forced every report into the
 same fixed structure. The report is now assembled dynamically by
 `pipeline/report.py::assemble_report` from the per-section prose — sections
 appear because the prompt defines them, not because a renderer `section_id`

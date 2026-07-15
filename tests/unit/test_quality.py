@@ -16,7 +16,7 @@ from pathlib import Path
 import pytest
 from sqlalchemy import select
 
-from hermes.pipeline.quality import (
+from newsagent.pipeline.quality import (
     QualityReport,
     RUBRIC,
     _heuristic_scores,
@@ -24,7 +24,7 @@ from hermes.pipeline.quality import (
     judge,
     run_quality,
 )
-from hermes.storage.models import Lesson
+from newsagent.storage.models import Lesson
 from tests.helpers import FakeRouter, _settings
 
 
@@ -64,10 +64,10 @@ class TestHeuristicScores:
 class TestJudge:
     @pytest.mark.asyncio
     async def test_judge_uses_llm_when_available(self, tmp_path):
-        from hermes.pipeline.context import RunContext
-        from hermes.storage.db import Store
-        from hermes.llm.embed import Embedder
-        from hermes.storage.vectorstore import build_vector_store
+        from newsagent.pipeline.context import RunContext
+        from newsagent.storage.db import Store
+        from newsagent.llm.embed import Embedder
+        from newsagent.storage.vectorstore import build_vector_store
 
         settings = _settings(tmp_path)
         store = Store(settings.sqlite_url)
@@ -88,10 +88,10 @@ class TestJudge:
 
     @pytest.mark.asyncio
     async def test_judge_falls_back_to_heuristic_on_empty_llm(self, tmp_path):
-        from hermes.pipeline.context import RunContext
-        from hermes.storage.db import Store
-        from hermes.llm.embed import Embedder
-        from hermes.storage.vectorstore import build_vector_store
+        from newsagent.pipeline.context import RunContext
+        from newsagent.storage.db import Store
+        from newsagent.llm.embed import Embedder
+        from newsagent.storage.vectorstore import build_vector_store
 
         class _EmptyRouter(FakeRouter):
             async def json_complete(self, role, prompt, *, system=None):
@@ -117,10 +117,10 @@ class TestJudge:
 class TestRunQuality:
     @pytest.mark.asyncio
     async def test_run_quality_writes_files_and_persists_lessons(self, tmp_path):
-        from hermes.pipeline.context import RunContext
-        from hermes.storage.db import Store
-        from hermes.llm.embed import Embedder
-        from hermes.storage.vectorstore import build_vector_store
+        from newsagent.pipeline.context import RunContext
+        from newsagent.storage.db import Store
+        from newsagent.llm.embed import Embedder
+        from newsagent.storage.vectorstore import build_vector_store
 
         settings = _settings(tmp_path)
         run_date = datetime(2026, 7, 11, tzinfo=timezone.utc)
@@ -153,7 +153,7 @@ class TestRunQuality:
         json_path = settings.storage.dir / "quality" / f"{rep.run_date}.json"
         assert json_path.exists()
         json_data = json.loads(json_path.read_text())
-        assert "hermes_score" in json_data
+        assert "newsagent_score" in json_data
         assert "per_dimension" in json_data
 
         # Lessons persisted
@@ -166,10 +166,10 @@ class TestRunQuality:
 
     @pytest.mark.asyncio
     async def test_run_quality_handles_missing_report(self, tmp_path):
-        from hermes.pipeline.context import RunContext
-        from hermes.storage.db import Store
-        from hermes.llm.embed import Embedder
-        from hermes.storage.vectorstore import build_vector_store
+        from newsagent.pipeline.context import RunContext
+        from newsagent.storage.db import Store
+        from newsagent.llm.embed import Embedder
+        from newsagent.storage.vectorstore import build_vector_store
 
         settings = _settings(tmp_path)
         run_date = datetime(2026, 7, 11, tzinfo=timezone.utc)
@@ -185,7 +185,7 @@ class TestRunQuality:
 
         rep = await run_quality(ctx, run_date, settings)
         assert "No report found" in rep.notes[0]
-        assert rep.hermes_score == 0.0
+        assert rep.newsagent_score == 0.0
         await store.close()
 
 
@@ -193,7 +193,7 @@ class TestRenderQuality:
     def test_render_includes_rubric_and_score(self):
         rep = QualityReport(
             run_date="2026-07-11",
-            hermes_score=3.5,
+            newsagent_score=3.5,
             per_dimension={dim: 3.5 for dim in RUBRIC},
             notes=["note 1", "note 2"],
         )

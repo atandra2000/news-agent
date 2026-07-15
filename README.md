@@ -1,6 +1,6 @@
-# Hermes — Autonomous AI Research Intelligence Agent
+# newsagent — Autonomous AI Research Intelligence Agent
 
-> Hermes runs once a day, researches the entire AI ecosystem across 15+ sources,
+> newsagent runs once a day, researches the entire AI ecosystem across 15+ sources,
 > reasons over every top item with LLMs, and writes one extensive Markdown report
 > — no human interaction, no daemon, no database server.
 
@@ -12,10 +12,10 @@
 
 ---
 
-## What Hermes does
+## What newsagent does
 
-Every `hermes news <prompt.md>` invocation executes the **unified research
-pipeline** (`run_news_pipeline` in `src/hermes/pipeline/orchestrator.py`). It
+Every `newsagent news <prompt.md>` invocation executes the **unified research
+pipeline** (`run_news_pipeline` in `src/newsagent/pipeline/orchestrator.py`). It
 turns raw web signal into an institutional-grade intelligence report driven by
 a Markdown prompt:
 
@@ -38,7 +38,7 @@ parse_prompt → collect → search → synthesize (per-section, with critic loo
 
 The brief pipeline always runs the same phases — collect, search, per-section
 synthesize with critic loop, report assembly, archive — regardless of the
-prompt's section count. Cadence (`HERMES_CADENCE=daily|weekly|monthly`)
+prompt's section count. Cadence (`NEWSAGENT_CADENCE=daily|weekly|monthly`)
 controls lookback window, per-section source count, and citation thresholds.
 
 ---
@@ -46,7 +46,7 @@ controls lookback window, per-section source count, and citation thresholds.
 ## Key features
 
 - **Fully autonomous prompt-driven report** — one CLI command
-  (`hermes news <prompt.md>`), scheduled by the OS (launchd / systemd / cron).
+  (`newsagent news <prompt.md>`), scheduled by the OS (launchd / systemd / cron).
   No daemon, no broker.
 - **Structured, artifact-passing pipeline** — every stage exchanges typed
   dataclasses, never prompt text. Only the Section Writer may emit prose.
@@ -71,22 +71,22 @@ controls lookback window, per-section source count, and citation thresholds.
 
 ```bash
 # 1. Clone + install (editable, with dev deps).
-git clone <repo> && cd hermes
+git clone <repo> && cd newsagent
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 
 # 2. Configure.
 cp .env.example .env
-# Edit .env — set HERMES_LLM_BACKEND, api key, (optional) search keys.
+# Edit .env — set NEWSAGENT_LLM_BACKEND, api key, (optional) search keys.
 
 # 3. Verify your LLM provider + model catalog is live.
-hermes models
+newsagent models
 
 # 4. Verify your LLM provider + model catalog is live.
-hermes models
+newsagent models
 
 # 5. Run the unified pipeline.
-hermes news example_prompt.md
+newsagent news example_prompt.md
 
 # 6. Read the report.
 open storage/reports/$(date +%Y-%m-%d).md
@@ -95,9 +95,9 @@ open storage/reports/$(date +%Y-%m-%d).md
 Evaluate the report or record a feedback rating:
 
 ```bash
-hermes eval storage/reports/ai-state-of-the-industry-2026.md \
+newsagent eval storage/reports/ai-state-of-the-industry-2026.md \
   --prompt example_prompt.md --cadence weekly
-hermes eval example_prompt.md --rate 4
+newsagent eval example_prompt.md --rate 4
 ```
 
 > **Test/tooling note:** the test suite and linters must be run with the project
@@ -113,7 +113,7 @@ hermes eval example_prompt.md --rate 4
 ## Architecture at a glance
 
 ```
-                         hermes news <prompt.md>
+                         newsagent news <prompt.md>
                                        │
    ┌────────── PARSE PROMPT ────────────┴───────────────────┐
    │  pipeline/spec.py: parse_prompt(md) → BriefSpec          │
@@ -142,14 +142,14 @@ hermes eval example_prompt.md --rate 4
 
 | Command | What it does |
 |---------|--------------|
-| `hermes news <prompt.md>` | Unified research pipeline (collect → ingest → evidence → graph → synthesize → report) |
-| `hermes eval <report.md> --prompt <prompt.md> [--cadence] [--rate 1-5]` | Evaluate a brief report / record user feedback |
-| `hermes status` | DB stats: items, reports, evals, adapter state |
-| `hermes sources` | List registered + enabled collectors |
-| `hermes models` | List models on the live endpoint + catalog check |
-| `hermes profiles` | List available report profiles |
-| `hermes quality [--date YYYY-MM-DD]` | Self-assess a report on 6 quality dimensions |
-| `hermes help` | Usage |
+| `newsagent news <prompt.md>` | Unified research pipeline (collect → ingest → evidence → graph → synthesize → report) |
+| `newsagent eval <report.md> --prompt <prompt.md> [--cadence] [--rate 1-5]` | Evaluate a brief report / record user feedback |
+| `newsagent status` | DB stats: items, reports, evals, adapter state |
+| `newsagent sources` | List registered + enabled collectors |
+| `newsagent models` | List models on the live endpoint + catalog check |
+| `newsagent profiles` | List available report profiles |
+| `newsagent quality [--date YYYY-MM-DD]` | Self-assess a report on 6 quality dimensions |
+| `newsagent help` | Usage |
 
 See [docs/CLI.md](docs/CLI.md) for flags and scheduler setup.
 
@@ -158,17 +158,17 @@ See [docs/CLI.md](docs/CLI.md) for flags and scheduler setup.
 ## Project layout
 
 ```
-hermes/
-├── src/hermes/
-│   ├── cli.py                 # Entry points (hermes news|eval|quality|status|sources|models|profiles)
-│   ├── config.py              # Pydantic settings (HERMES_ env prefix)
+newsagent/
+├── src/newsagent/
+│   ├── cli.py                 # Entry points (newsagent news|eval|quality|status|sources|models|profiles)
+│   ├── config.py              # Pydantic settings (NEWSAGENT_ env prefix)
 │   ├── collectors/            # 15 source adapters + registry
 │   ├── dedup.py               # 64-bit SimHash + SHA-256 exact dedup
 │   ├── llm/                   # catalog, roles, router, providers, embed, prompts
 │   ├── pipeline/
 │   │   ├── orchestrator.py    # run_news_pipeline — the unified pipeline
 │   │   ├── spec.py            # parse_prompt(md) → BriefSpec
-│   │   ├── cadence.py         # CadenceSpec + HERMES_CADENCE loader
+│   │   ├── cadence.py         # CadenceSpec + NEWSAGENT_CADENCE loader
 │   │   ├── planner.py, search.py, synthesize.py, report.py, eval.py, adapter.py
 │   │   ├── retrieval.py      # past-report RAG chunks
 │   │   └── models.py          # Structured intermediate artifacts
@@ -200,7 +200,7 @@ hermes/
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Dev setup, testing, lint, code style |
 | [CHANGELOG.md](CHANGELOG.md) | Release history |
 
-> **Historical / design references:** [`docs/HERMES_DESIGN.md`](docs/HERMES_DESIGN.md)
+> **Historical / design references:** [`docs/NEWSAGENT_DESIGN.md`](docs/NEWSAGENT_DESIGN.md)
 > (original architecture & migration design) and
 > [`docs/COGNITION_DESIGN.md`](docs/COGNITION_DESIGN.md) (cognitive architecture)
 > describe the evolution and are kept for context. The **current** pipeline is
@@ -227,7 +227,7 @@ hermes/
 | Layer | Choice | Why |
 |-------|--------|-----|
 | Python | ≥ 3.11 | `match`, `Self`, PEP 695 type hints |
-| Settings | pydantic + pydantic-settings | Typed env validation, `HERMES_` prefix |
+| Settings | pydantic + pydantic-settings | Typed env validation, `NEWSAGENT_` prefix |
 | Logging | structlog | Console + JSON renderer, contextvars |
 | Storage | SQLAlchemy[asyncio] + aiosqlite | One file, zero infra, async |
 | Vectors | numpy (default) or Qdrant (embedded) | Pluggable VectorStore |

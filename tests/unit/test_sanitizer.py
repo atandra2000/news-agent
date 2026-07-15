@@ -6,7 +6,7 @@ into the final markdown.  These tests verify every banned category.
 
 from __future__ import annotations
 
-from hermes.pipeline.sanitizer import (
+from newsagent.pipeline.sanitizer import (
     has_leakage,
     sanitize_text,
 )
@@ -116,7 +116,7 @@ class TestIsSynthesisFailureStub:
     """Detect the orchestrator's last-resort stub so the renderer can drop it."""
 
     def test_synthesis_failure_stub_detected(self):
-        from hermes.pipeline.sanitizer import is_synthesis_failure_stub
+        from newsagent.pipeline.sanitizer import is_synthesis_failure_stub
 
         assert is_synthesis_failure_stub(
             "## **6. Open Source AI**\n\n_Synthesis for this section did not produce "
@@ -125,7 +125,7 @@ class TestIsSynthesisFailureStub:
         )
 
     def test_real_prose_not_flagged(self):
-        from hermes.pipeline.sanitizer import is_synthesis_failure_stub
+        from newsagent.pipeline.sanitizer import is_synthesis_failure_stub
 
         real = (
             "## **1. Executive Summary**\n\n"

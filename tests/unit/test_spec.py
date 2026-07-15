@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from hermes.pipeline.spec import parse_prompt
+from newsagent.pipeline.spec import parse_prompt
 
 _REPO = Path(__file__).resolve().parents[2]
 _PROMPT = _REPO / "example_prompt.md"

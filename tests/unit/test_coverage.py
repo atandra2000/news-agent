@@ -7,14 +7,14 @@ and the writer's honesty about thin evidence.
 
 from __future__ import annotations
 
-from hermes.pipeline.coverage import (
+from newsagent.pipeline.coverage import (
     _category_for,
     _category_for_explicit,
     _section_required_category,
     evaluate_coverage,
 )
-from hermes.pipeline.search import SearchResult
-from hermes.pipeline.spec import BriefSpec, SectionSpec
+from newsagent.pipeline.search import SearchResult
+from newsagent.pipeline.spec import BriefSpec, SectionSpec
 
 
 def _src(source: str, url: str = "https://x/1") -> SearchResult:

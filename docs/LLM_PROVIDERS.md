@@ -1,6 +1,6 @@
 # LLM Providers
 
-> How Hermes wires LLM providers, role routing, model catalogs, tiers, and the
+> How newsagent wires LLM providers, role routing, model catalogs, tiers, and the
 > reasoning-token starvation pitfall.
 
 ---
@@ -44,7 +44,7 @@ role (label, write, research, ...)
     → model chain (deepseek-v4-flash, kimi-k2.6, deepseek-v4-pro, ...)
 ```
 
-### 2.1 Roles (`hermes/llm/roles.py`)
+### 2.1 Roles (`newsagent/llm/roles.py`)
 
 Each role has: a `chain` (ordered fallback), `temperature`, `max_tokens`,
 `num_ctx`, `keep_alive`.
@@ -65,7 +65,7 @@ Each role has: a `chain` (ordered fallback), `temperature`, `max_tokens`,
 | `brief_write` | writer | 0.3 | 5000 | Brief pipeline section writing |
 | `brief_plan` | plan | 0.2 | 1500 | Brief query planning |
 
-### 2.2 Tiers (`hermes/llm/catalog.py`)
+### 2.2 Tiers (`newsagent/llm/catalog.py`)
 
 Each provider has an ordered fallback chain per tier. First success wins.
 
@@ -91,34 +91,34 @@ Each provider has an ordered fallback chain per tier. First success wins.
 
 ## 3. Providers
 
-### 3.1 OllamaProvider (`hermes/llm/providers/ollama.py`)
+### 3.1 OllamaProvider (`newsagent/llm/providers/ollama.py`)
 
 - **Endpoints:** `/api/chat` (primary) with fallback to `/api/generate`.
 - **Auth:** `Authorization: Bearer <key>` when `api_key` is set.
 - **Format:** Supports `format: "json"` for JSON-mode output.
 - **Options:** `num_ctx`, `keep_alive` (model residency between calls).
-- **Model list:** `GET /api/tags` → used by `hermes models`.
+- **Model list:** `GET /api/tags` → used by `newsagent models`.
 
-### 3.2 OpenCodeGoProvider (`hermes/llm/providers/opencode_go.py`)
+### 3.2 OpenCodeGoProvider (`newsagent/llm/providers/opencode_go.py`)
 
 - **Endpoint:** `/chat/completions` (OpenAI-compatible).
 - **Auth:** `Authorization: Bearer <key>` (required).
 - **Format:** `response_format: {"type": "json_object"}` for JSON mode.
-- **Model list:** `GET /models` → used by `hermes models`.
+- **Model list:** `GET /models` → used by `newsagent models`.
 
-### 3.3 OpenAICompatibleProvider (`hermes/llm/providers/openai_compatible.py`)
+### 3.3 OpenAICompatibleProvider (`newsagent/llm/providers/openai_compatible.py`)
 
 - **Endpoint:** `/chat/completions` (any OpenAI-compatible).
 - **Auth:** `Authorization: Bearer <key>` when `api_key` is set.
 - **Format:** `response_format: {"type": "json_object"}` for JSON mode.
-- **Model list:** No list endpoint — set model id in `HERMES_LLM_OPENAI_MODEL`.
+- **Model list:** No list endpoint — set model id in `NEWSAGENT_LLM_OPENAI_MODEL`.
 
 ---
 
 ## 4. Provider routing
 
-`build_registry()` in `hermes/llm/providers/registry.py` constructs the
-provider set based on `HERMES_LLM_BACKEND`:
+`build_registry()` in `newsagent/llm/providers/registry.py` constructs the
+provider set based on `NEWSAGENT_LLM_BACKEND`:
 
 | Backend | Default provider | `default_model` | Behavior |
 |---------|-----------------|-----------------|----------|
@@ -144,7 +144,7 @@ def model_name(self, model: str) -> str:
 to `reasoning_content` and only populate `content` **after** reasoning finishes.
 If `max_tokens` is too small, all tokens go to reasoning and `content` is empty.
 
-**Impact on Hermes:** The `label` role uses `max_tokens=64`. If `glm-5.1` is
+**Impact on newsagent:** The `label` role uses `max_tokens=64`. If `glm-5.1` is
 the default model, `label` calls return empty `content` → the router treats
 this as a failure → falls back to heuristics → cluster labels degrade.
 
@@ -207,7 +207,7 @@ if self.stats.total_tokens > self.token_budget:
 
 ```bash
 # List all models on the live endpoint + check catalog alignment.
-hermes models
+newsagent models
 ```
 
 Output:
@@ -222,7 +222,7 @@ Available on endpoint: 20 models
   - kimi-k2.6
   ...
 
-Curated catalog tiers (hermes/llm/catalog.py):
+Curated catalog tiers (newsagent/llm/catalog.py):
   [writer] deepseek-v4-pro > kimi-k2.6 > glm-5.2   (✓ ✓ ✓)
   [critic] kimi-k2.6 > deepseek-v4-pro > glm-5.2   (✓ ✓ ✓)
   [plan] kimi-k2.6 > deepseek-v4-flash > deepseek-v4-pro   (✓ ✓ ✓)
@@ -235,7 +235,7 @@ Curated catalog tiers (hermes/llm/catalog.py):
 
 ## 8. Adding a new provider
 
-1. Create `hermes/llm/providers/<name>.py` with a class subclassing
+1. Create `newsagent/llm/providers/<name>.py` with a class subclassing
    `BaseProvider`:
    ```python
    class MyProvider(BaseProvider):
@@ -248,8 +248,8 @@ Curated catalog tiers (hermes/llm/catalog.py):
            return ProviderResult(text=..., model=model, provider=self.name,
                                  prompt_tokens=..., completion_tokens=...)
    ```
-2. Register it in `hermes/llm/providers/registry.py: build_registry()`.
-3. Add a catalog entry in `hermes/llm/catalog.py` if it has tier-specific
+2. Register it in `newsagent/llm/providers/registry.py: build_registry()`.
+3. Add a catalog entry in `newsagent/llm/catalog.py` if it has tier-specific
    models.
-4. Add a `HERMES_LLM_<NAME>_*` settings group in `hermes/config.py: LLMConfig`.
-5. Add a `hermes models` branch in `cli.py: _cmd_models()` to list its models.
+4. Add a `NEWSAGENT_LLM_<NAME>_*` settings group in `newsagent/config.py: LLMConfig`.
+5. Add a `newsagent models` branch in `cli.py: _cmd_models()` to list its models.

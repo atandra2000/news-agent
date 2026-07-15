@@ -6,9 +6,9 @@ import asyncio
 
 import pytest
 
-from hermes.collectors.registry import REGISTRY
-from hermes.output import ObsidianSink, build_sinks
-from hermes.profiles import PROFILES, get_profile, list_profiles
+from newsagent.collectors.registry import REGISTRY
+from newsagent.output import ObsidianSink, build_sinks
+from newsagent.profiles import PROFILES, get_profile, list_profiles
 
 
 def test_new_collectors_registered():
@@ -46,6 +46,6 @@ def test_sinks(tmp_path):
     sink = ObsidianSink(vault)
     meta = {"date": "2026-07-10"}
     asyncio.run(sink.deliver("# Hello\n\nbody", meta))
-    out = (vault / "Hermes_2026-07-10.md").read_text()
+    out = (vault / "newsagent_2026-07-10.md").read_text()
     assert out.startswith("---")
     assert "tags:" in out

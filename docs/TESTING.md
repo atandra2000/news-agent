@@ -79,7 +79,7 @@ fail in a specific test).
 
 ### `_settings(tmp_path)`
 
-Builds isolated `HermesSettings` for offline tests:
+Builds isolated `NewsAgentSettings` for offline tests:
 - `storage.dir = tmp_path` (in-memory SQLite)
 - `embed.model = "hashing"` (zero-dep)
 - `embed.dim = 256`
@@ -293,7 +293,7 @@ Used by `test_extended.py`, `test_quality.py`.
 
 ```python
 # tests/unit/test_my_module.py
-from hermes.my_module import my_function
+from newsagent.my_module import my_function
 
 def test_my_function():
     assert my_function("input") == "expected"
@@ -334,10 +334,10 @@ async def test_http_call():
 ```bash
 # Ruff (lint + format).
 .venv/bin/python -m ruff check src/ tests/
-.venv/bin/python -m ruff check --fix src/hermes/llm/catalog.py src/hermes/config.py
+.venv/bin/python -m ruff check --fix src/newsagent/llm/catalog.py src/newsagent/config.py
 
 # Mypy (type check).
-.venv/bin/python -m mypy src/hermes/
+.venv/bin/python -m mypy src/newsagent/
 ```
 
 Both are configured in `pyproject.toml`. Ruff target: `py311`, line-length 100.

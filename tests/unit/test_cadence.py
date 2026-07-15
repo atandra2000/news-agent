@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from hermes.pipeline.cadence import CADENCE, CadenceSpec, resolve_cadence
+from newsagent.pipeline.cadence import CADENCE, CadenceSpec, resolve_cadence
 
 
 def test_cadence_table_has_three_entries():

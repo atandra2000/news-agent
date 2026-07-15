@@ -1,10 +1,10 @@
-# Hermes Pipeline Unification — Implementation Plan
+# newsagent Pipeline Unification — Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace the two-pipeline structure (`hermes run` daily + `hermes news` brief) with a single, brief-driven pipeline. The cognition core (artifact-passing 14 stages in `pipeline/stages/`) becomes the body of the brief path. All legacy/fallback code is deleted. One command, one pipeline, one file.
+**Goal:** Replace the two-pipeline structure (`newsagent run` daily + `newsagent news` brief) with a single, brief-driven pipeline. The cognition core (artifact-passing 14 stages in `pipeline/stages/`) becomes the body of the brief path. All legacy/fallback code is deleted. One command, one pipeline, one file.
 
-**Architecture:** Move `brief/*` modules into `pipeline/*` (no behavior change). Replace `pipeline/run.py` with a new orchestrator that drives both per-section synthesis AND the optional cognition core (when `len(spec.sections) >= FULL_COGNITION_MIN_SECTIONS = 3`). Delete the daily-path orchestrator, the 18-renderer fallback, the analyzers, the 4 legacy pipeline modules (`cluster`, `rank`, `planning`, `research`), `quality_gates`, and `prioritize`. Slim `PipelineConfig` and `SearchConfig`. Add `HERMES_CADENCE` env var. Drop KG writes; past-reports RAG remains.
+**Architecture:** Move `brief/*` modules into `pipeline/*` (no behavior change). Replace `pipeline/run.py` with a new orchestrator that drives both per-section synthesis AND the optional cognition core (when `len(spec.sections) >= FULL_COGNITION_MIN_SECTIONS = 3`). Delete the daily-path orchestrator, the 18-renderer fallback, the analyzers, the 4 legacy pipeline modules (`cluster`, `rank`, `planning`, `research`), `quality_gates`, and `prioritize`. Slim `PipelineConfig` and `SearchConfig`. Add `NEWSAGENT_CADENCE` env var. Drop KG writes; past-reports RAG remains.
 
 **Tech Stack:** Python 3.11+, pydantic-settings, structlog, SQLAlchemy 2 async, aiosqlite, httpx, tenacity, jinja2, pytest + pytest-asyncio + respx, ruff.
 
@@ -21,9 +21,9 @@
 - **The repo is NOT a git repo** (`Is a git repository: false`). Skip the `git add` / `git commit` steps in the task templates. Verify with `.venv/bin/python -m pytest -q tests/` instead.
 - **Vault sync runs automatically** via the `Stop` hook in `~/.claude/settings.json` for any new/modified `.md` in `~/Desktop/CoreProjects/`. Don't hand-edit mirror files in `~/Documents/obsidian`.
 - **No `Co-Authored-By: Claude` trailers** in any commit message (per `~/.claude/CLAUDE.md`).
-- **Imports use `hermes.pipeline.{spec, planner, search, synthesize, report, eval, adapter}` after the move** — never `hermes.brief.*` in new code.
+- **Imports use `newsagent.pipeline.{spec, planner, search, synthesize, report, eval, adapter}` after the move** — never `newsagent.brief.*` in new code.
 - **The 9 prompts in `prompts/` keep working** — `parse_prompt` is the new name of `parse_brief` but accepts the same Markdown format.
-- **The launchd plist** must call `hermes news <path-to-prompt>` after Task 17.
+- **The launchd plist** must call `newsagent news <path-to-prompt>` after Task 17.
 
 ---
 
@@ -33,33 +33,33 @@
 
 | Path | Responsibility |
 |---|---|
-| `src/hermes/pipeline/spec.py` | `parse_prompt(md) -> BriefSpec` (moved from `brief/spec.py`) |
-| `src/hermes/pipeline/planner.py` | `plan_queries(spec) -> list[ResearchQuery]` (moved) |
-| `src/hermes/pipeline/search.py` | Tavily + Null search providers, `dedup_sources` (moved) |
-| `src/hermes/pipeline/synthesize.py` | Per-section synthesis + critic loop + CoT backstop (moved) |
-| `src/hermes/pipeline/report.py` | Citation resolution + assembly (moved) |
-| `src/hermes/pipeline/eval.py` | Report scoring (moved) |
-| `src/hermes/pipeline/adapter.py` | Per-prompt adaptive state (moved) |
-| `src/hermes/pipeline/orchestrator.py` | The new unified orchestrator |
-| `src/hermes/pipeline/cognition.py` | The optional cognition core driver (when 3+ sections) |
-| `src/hermes/pipeline/cadence.py` | The `_CADENCE` table + lookup (extracted from `brief/run.py`) |
+| `src/newsagent/pipeline/spec.py` | `parse_prompt(md) -> BriefSpec` (moved from `brief/spec.py`) |
+| `src/newsagent/pipeline/planner.py` | `plan_queries(spec) -> list[ResearchQuery]` (moved) |
+| `src/newsagent/pipeline/search.py` | Tavily + Null search providers, `dedup_sources` (moved) |
+| `src/newsagent/pipeline/synthesize.py` | Per-section synthesis + critic loop + CoT backstop (moved) |
+| `src/newsagent/pipeline/report.py` | Citation resolution + assembly (moved) |
+| `src/newsagent/pipeline/eval.py` | Report scoring (moved) |
+| `src/newsagent/pipeline/adapter.py` | Per-prompt adaptive state (moved) |
+| `src/newsagent/pipeline/orchestrator.py` | The new unified orchestrator |
+| `src/newsagent/pipeline/cognition.py` | The optional cognition core driver (when 3+ sections) |
+| `src/newsagent/pipeline/cadence.py` | The `_CADENCE` table + lookup (extracted from `brief/run.py`) |
 | `tests/unit/test_spec.py` | (renamed from `test_brief_spec.py`) |
 | `tests/unit/test_planner.py` | (renamed from `test_brief_planner.py`) |
 | `tests/unit/test_report.py` | (renamed from `test_brief_citations.py`, trimmed) |
 | `tests/unit/test_synthesize.py` | (new — per-section synthesis with critic loop) |
 | `tests/unit/test_embed.py` | (new — Embedder hashing) |
 | `tests/unit/test_eval.py` | (new — split from `test_brief_citations.py`) |
-| `tests/unit/test_cadence.py` | (new — `_CADENCE` table + `HERMES_CADENCE` validation) |
+| `tests/unit/test_cadence.py` | (new — `_CADENCE` table + `NEWSAGENT_CADENCE` validation) |
 | `tests/integration/test_news_run.py` | (new — full pipeline end-to-end with mocked LLM) |
 
 ### Files modified
 
 | Path | Change |
 |---|---|
-| `src/hermes/pipeline/run.py` | Replaced (Task 12) by `orchestrator.py` — file deleted in Task 18 |
-| `src/hermes/config.py` | `PipelineConfig` slimmed (Task 4); `SearchConfig` slimmed (Task 4); `HermesSettings` gains `cadence: str` (Task 3) |
-| `src/hermes/cli.py` | `hermes run`, `hermes backfill`, `hermes research` removed (Task 17) |
-| `scheduler/launchd.plist` | Update to `hermes news <path-to-prompt>` (Task 19) |
+| `src/newsagent/pipeline/run.py` | Replaced (Task 12) by `orchestrator.py` — file deleted in Task 18 |
+| `src/newsagent/config.py` | `PipelineConfig` slimmed (Task 4); `SearchConfig` slimmed (Task 4); `NewsAgentSettings` gains `cadence: str` (Task 3) |
+| `src/newsagent/cli.py` | `newsagent run`, `newsagent backfill`, `newsagent research` removed (Task 17) |
+| `scheduler/launchd.plist` | Update to `newsagent news <path-to-prompt>` (Task 19) |
 | `scheduler/cron.txt` | Same (Task 19) |
 | `scheduler/systemd.service` | Same (Task 19) |
 | `scheduler/systemd.timer` | Same (Task 19) |
@@ -73,20 +73,20 @@
 
 ### Files deleted (Task 18)
 
-- `src/hermes/brief/` (entire package)
-- `src/hermes/analyzers/` (entire package)
-- `src/hermes/renderers/` (entire package)
-- `src/hermes/pipeline/cluster.py`
-- `src/hermes/pipeline/rank.py`
-- `src/hermes/pipeline/planning.py`
-- `src/hermes/pipeline/research.py`
-- `src/hermes/pipeline/quality_gates.py`
-- `src/hermes/pipeline/prioritize.py`
-- `src/hermes/pipeline/run.py` (replaced by `orchestrator.py`)
+- `src/newsagent/brief/` (entire package)
+- `src/newsagent/analyzers/` (entire package)
+- `src/newsagent/renderers/` (entire package)
+- `src/newsagent/pipeline/cluster.py`
+- `src/newsagent/pipeline/rank.py`
+- `src/newsagent/pipeline/planning.py`
+- `src/newsagent/pipeline/research.py`
+- `src/newsagent/pipeline/quality_gates.py`
+- `src/newsagent/pipeline/prioritize.py`
+- `src/newsagent/pipeline/run.py` (replaced by `orchestrator.py`)
 - `tests/unit/test_quality_gates.py`
 - `tests/integration/test_pipeline.py`
 - `docs/BRIEF.md` (content moves to `PIPELINE.md` + `CONFIGURATION.md`)
-- `docs/HERMES_DESIGN.md` is **kept** (historical reference)
+- `docs/NEWSAGENT_DESIGN.md` is **kept** (historical reference)
 - `docs/COGNITION_DESIGN.md` is **kept** (historical reference)
 
 ---
@@ -100,8 +100,8 @@ The tasks are designed so each one keeps the test suite green. Tasks 1-2 are mov
 ### Task 1: Move `brief/spec.py` → `pipeline/spec.py`
 
 **Files:**
-- Create: `src/hermes/pipeline/spec.py` (from `src/hermes/brief/spec.py`)
-- Modify: `src/hermes/pipeline/spec.py` (rename `parse_brief` → `parse_prompt`, but keep `parse_brief` as an alias for one release)
+- Create: `src/newsagent/pipeline/spec.py` (from `src/newsagent/brief/spec.py`)
+- Modify: `src/newsagent/pipeline/spec.py` (rename `parse_brief` → `parse_prompt`, but keep `parse_brief` as an alias for one release)
 - Test: `tests/unit/test_brief_spec.py` (rename in Task 2)
 
 **Interfaces:**
@@ -110,12 +110,12 @@ The tasks are designed so each one keeps the test suite green. Tasks 1-2 are mov
 
 - [ ] **Step 1: Read the existing `brief/spec.py`**
 
-Read `src/hermes/brief/spec.py` (201 LoC). Note: `parse_brief` is the public name.
+Read `src/newsagent/brief/spec.py` (201 LoC). Note: `parse_brief` is the public name.
 
 - [ ] **Step 2: Copy the file to `pipeline/spec.py`**
 
 ```bash
-cp src/hermes/brief/spec.py src/hermes/pipeline/spec.py
+cp src/newsagent/brief/spec.py src/newsagent/pipeline/spec.py
 ```
 
 - [ ] **Step 3: Update imports inside the moved file**
@@ -124,7 +124,7 @@ The file imports only stdlib (`re`, `dataclasses`). No changes needed for those.
 
 - [ ] **Step 4: Rename `parse_brief` to `parse_prompt` and add a compatibility alias**
 
-Edit `src/hermes/pipeline/spec.py`:
+Edit `src/newsagent/pipeline/spec.py`:
 
 ```python
 # Find:
@@ -150,7 +150,7 @@ Expected: PASS. (The test file still imports from `brief.spec`.)
 - [ ] **Step 6: Verify ruff is clean**
 
 ```bash
-.venv/bin/python -m ruff check src/hermes/pipeline/spec.py
+.venv/bin/python -m ruff check src/newsagent/pipeline/spec.py
 ```
 
 Expected: clean.
@@ -169,7 +169,7 @@ Expected: clean.
 cp tests/unit/test_brief_spec.py tests/unit/test_spec.py
 ```
 
-Then edit `tests/unit/test_spec.py`: change every `from hermes.brief.spec import` to `from hermes.pipeline.spec import`. The test file is small (1182 bytes) — do this with `Edit` on the import line.
+Then edit `tests/unit/test_spec.py`: change every `from newsagent.brief.spec import` to `from newsagent.pipeline.spec import`. The test file is small (1182 bytes) — do this with `Edit` on the import line.
 
 - [ ] **Step 2: Run the test**
 
@@ -195,21 +195,21 @@ Expected: 263 passed.
 
 ---
 
-### Task 3: Add `cadence` to `HermesSettings`
+### Task 3: Add `cadence` to `NewsAgentSettings`
 
 **Files:**
-- Modify: `src/hermes/config.py` (add `cadence` field to `HermesSettings`)
+- Modify: `src/newsagent/config.py` (add `cadence` field to `NewsAgentSettings`)
 
 **Interfaces:**
-- Produces: `HermesSettings.cadence: str` (default `"daily"`, validated to one of `daily|weekly|monthly`)
+- Produces: `NewsAgentSettings.cadence: str` (default `"daily"`, validated to one of `daily|weekly|monthly`)
 
-- [ ] **Step 1: Read the existing `HermesSettings` class**
+- [ ] **Step 1: Read the existing `NewsAgentSettings` class**
 
-Located in `src/hermes/config.py:202-243`.
+Located in `src/newsagent/config.py:202-243`.
 
 - [ ] **Step 2: Add the `cadence` field with a validator**
 
-Edit `src/hermes/config.py`. After `log_level: str = "INFO"` add:
+Edit `src/newsagent/config.py`. After `log_level: str = "INFO"` add:
 
 ```python
 # Cadence drives the lookback window + per-section source counts.
@@ -229,7 +229,7 @@ Expected: 263 passed.
 - [ ] **Step 4: Verify ruff clean**
 
 ```bash
-.venv/bin/python -m ruff check src/hermes/config.py
+.venv/bin/python -m ruff check src/newsagent/config.py
 ```
 
 ---
@@ -237,7 +237,7 @@ Expected: 263 passed.
 ### Task 4: Slim `PipelineConfig` and `SearchConfig`
 
 **Files:**
-- Modify: `src/hermes/config.py`
+- Modify: `src/newsagent/config.py`
 
 **Interfaces:**
 - `PipelineConfig`: removes `self_critique`, `rag_writing`, `research_loops`, `critic_max_chars`, `analyze_max_chars`, `prioritizer_front_page_k`, `prioritizer_analysis_k`, `prioritizer_min_score`. Keeps `top_k_analysis`, `top_k_clusters`, `report_top_k`, `similarity_threshold`, `cluster_label_max_chars`, `section_concurrency`, `graph_context_max_chars`, `thesis_enabled`, `editorial_board_enabled`, `writer_extract_cot`.
@@ -245,7 +245,7 @@ Expected: 263 passed.
 
 - [ ] **Step 1: Remove dead fields from `PipelineConfig`**
 
-Edit `src/hermes/config.py`. In the `PipelineConfig` class body, remove these lines:
+Edit `src/newsagent/config.py`. In the `PipelineConfig` class body, remove these lines:
 
 ```python
     # Enable the in-pipeline Critic -> Rewrite loop.
@@ -270,7 +270,7 @@ Edit `src/hermes/config.py`. In the `PipelineConfig` class body, remove these li
 
 - [ ] **Step 2: Remove dead fields from `SearchConfig`**
 
-Edit `src/hermes/config.py`. In the `SearchConfig` class body, remove these lines:
+Edit `src/newsagent/config.py`. In the `SearchConfig` class body, remove these lines:
 
 ```python
     # Results per query.
@@ -298,7 +298,7 @@ Expected: 263 passed. (No test reads the removed fields today.)
 - [ ] **Step 4: Verify ruff clean**
 
 ```bash
-.venv/bin/python -m ruff check src/hermes/config.py
+.venv/bin/python -m ruff check src/newsagent/config.py
 ```
 
 ---
@@ -306,7 +306,7 @@ Expected: 263 passed. (No test reads the removed fields today.)
 ### Task 5: Create `pipeline/cadence.py` with the per-cadence table
 
 **Files:**
-- Create: `src/hermes/pipeline/cadence.py`
+- Create: `src/newsagent/pipeline/cadence.py`
 - Test: `tests/unit/test_cadence.py`
 
 **Interfaces:**
@@ -325,7 +325,7 @@ from __future__ import annotations
 
 import pytest
 
-from hermes.pipeline.cadence import CADENCE, CadenceSpec, resolve_cadence
+from newsagent.pipeline.cadence import CADENCE, CadenceSpec, resolve_cadence
 
 
 def test_cadence_table_has_three_entries():
@@ -368,11 +368,11 @@ def test_cadence_spec_is_a_dataclass():
 .venv/bin/python -m pytest tests/unit/test_cadence.py -q
 ```
 
-Expected: FAIL with `ModuleNotFoundError: hermes.pipeline.cadence`.
+Expected: FAIL with `ModuleNotFoundError: newsagent.pipeline.cadence`.
 
 - [ ] **Step 3: Implement the module**
 
-Create `src/hermes/pipeline/cadence.py`:
+Create `src/newsagent/pipeline/cadence.py`:
 
 ```python
 """Per-cadence tuning: lookback window, days, per-section fan-out, max_tokens.
@@ -453,7 +453,7 @@ Expected: 271 passed (263 + 8 new).
 - [ ] **Step 6: Verify ruff clean**
 
 ```bash
-.venv/bin/python -m ruff check src/hermes/pipeline/cadence.py tests/unit/test_cadence.py
+.venv/bin/python -m ruff check src/newsagent/pipeline/cadence.py tests/unit/test_cadence.py
 ```
 
 ---
@@ -461,7 +461,7 @@ Expected: 271 passed (263 + 8 new).
 ### Task 6: Move `brief/planner.py` → `pipeline/planner.py`
 
 **Files:**
-- Create: `src/hermes/pipeline/planner.py` (from `src/hermes/brief/planner.py`)
+- Create: `src/newsagent/pipeline/planner.py` (from `src/newsagent/brief/planner.py`)
 - Modify: imports inside the moved file
 
 **Interfaces:**
@@ -470,10 +470,10 @@ Expected: 271 passed (263 + 8 new).
 - [ ] **Step 1: Copy and update imports**
 
 ```bash
-cp src/hermes/brief/planner.py src/hermes/pipeline/planner.py
+cp src/newsagent/brief/planner.py src/newsagent/pipeline/planner.py
 ```
 
-Edit `src/hermes/pipeline/planner.py` — find `from hermes.brief.spec import BriefSpec, SectionSpec` and replace with `from hermes.pipeline.spec import BriefSpec, SectionSpec`.
+Edit `src/newsagent/pipeline/planner.py` — find `from newsagent.brief.spec import BriefSpec, SectionSpec` and replace with `from newsagent.pipeline.spec import BriefSpec, SectionSpec`.
 
 - [ ] **Step 2: Run existing test against the moved module via a re-pointed import**
 
@@ -488,7 +488,7 @@ Expected: PASS (the old `brief.planner` is still there).
 - [ ] **Step 3: Verify ruff clean**
 
 ```bash
-.venv/bin/python -m ruff check src/hermes/pipeline/planner.py
+.venv/bin/python -m ruff check src/newsagent/pipeline/planner.py
 ```
 
 ---
@@ -496,7 +496,7 @@ Expected: PASS (the old `brief.planner` is still there).
 ### Task 7: Move `brief/search.py` → `pipeline/search.py`
 
 **Files:**
-- Create: `src/hermes/pipeline/search.py` (from `src/hermes/brief/search.py`)
+- Create: `src/newsagent/pipeline/search.py` (from `src/newsagent/brief/search.py`)
 - Modify: imports inside the moved file
 
 **Interfaces:**
@@ -505,14 +505,14 @@ Expected: PASS (the old `brief.planner` is still there).
 - [ ] **Step 1: Copy and update imports**
 
 ```bash
-cp src/hermes/brief/search.py src/hermes/pipeline/search.py
+cp src/newsagent/brief/search.py src/newsagent/pipeline/search.py
 ```
 
-Edit `src/hermes/pipeline/search.py` — find `from hermes.config import SearchConfig` and `from hermes.logging import get_logger` (no change needed — both already point at the right place).
+Edit `src/newsagent/pipeline/search.py` — find `from newsagent.config import SearchConfig` and `from newsagent.logging import get_logger` (no change needed — both already point at the right place).
 
 - [ ] **Step 2: Replace the removed SearchConfig fields with hardcoded constants**
 
-The new `SearchConfig` (Task 4) no longer has `topic`, `search_depth`, or `include_raw_content`. The Tavily client needs these. Replace them with module-level constants in `src/hermes/pipeline/search.py`:
+The new `SearchConfig` (Task 4) no longer has `topic`, `search_depth`, or `include_raw_content`. The Tavily client needs these. Replace them with module-level constants in `src/newsagent/pipeline/search.py`:
 
 Find:
 
@@ -560,7 +560,7 @@ Expected: 271 passed. (The existing tests use the old `brief.search`; the new `p
 - [ ] **Step 4: Verify ruff clean**
 
 ```bash
-.venv/bin/python -m ruff check src/hermes/pipeline/search.py
+.venv/bin/python -m ruff check src/newsagent/pipeline/search.py
 ```
 
 ---
@@ -568,7 +568,7 @@ Expected: 271 passed. (The existing tests use the old `brief.search`; the new `p
 ### Task 8: Move `brief/synthesize.py` → `pipeline/synthesize.py`
 
 **Files:**
-- Create: `src/hermes/pipeline/synthesize.py` (from `src/hermes/brief/synthesize.py`)
+- Create: `src/newsagent/pipeline/synthesize.py` (from `src/newsagent/brief/synthesize.py`)
 
 **Interfaces:**
 - Produces: `select_relevant`, `build_section_prompt`, `synthesize_section`, `synthesize_section_with_review`, `clean_section_text`, `is_substantial_section`, `_content_word_count`, `count_citations`, `_SECTION_MIN_WORDS`, `extract_prose` (if it's here — confirm during read)
@@ -580,23 +580,23 @@ Read the entire 585 LoC file. Note the public names.
 - [ ] **Step 2: Copy and update imports**
 
 ```bash
-cp src/hermes/brief/synthesize.py src/hermes/pipeline/synthesize.py
+cp src/newsagent/brief/synthesize.py src/newsagent/pipeline/synthesize.py
 ```
 
-Edit `src/hermes/pipeline/synthesize.py`. Replace the three `from hermes.brief.*` imports:
+Edit `src/newsagent/pipeline/synthesize.py`. Replace the three `from newsagent.brief.*` imports:
 
 ```python
-from hermes.brief.planner import section_keywords
-from hermes.brief.search import SearchResult, _host
-from hermes.brief.spec import SectionSpec
+from newsagent.brief.planner import section_keywords
+from newsagent.brief.search import SearchResult, _host
+from newsagent.brief.spec import SectionSpec
 ```
 
 With:
 
 ```python
-from hermes.pipeline.planner import section_keywords
-from hermes.pipeline.search import SearchResult, _host
-from hermes.pipeline.spec import SectionSpec
+from newsagent.pipeline.planner import section_keywords
+from newsagent.pipeline.search import SearchResult, _host
+from newsagent.pipeline.spec import SectionSpec
 ```
 
 - [ ] **Step 3: Run the test suite**
@@ -610,7 +610,7 @@ Expected: 271 passed.
 - [ ] **Step 4: Verify ruff clean**
 
 ```bash
-.venv/bin/python -m ruff check src/hermes/pipeline/synthesize.py
+.venv/bin/python -m ruff check src/newsagent/pipeline/synthesize.py
 ```
 
 ---
@@ -618,9 +618,9 @@ Expected: 271 passed.
 ### Task 9: Move `brief/report.py`, `brief/eval.py`, `brief/adapter.py` → `pipeline/`
 
 **Files:**
-- Create: `src/hermes/pipeline/report.py` (from `src/hermes/brief/report.py`)
-- Create: `src/hermes/pipeline/eval.py` (from `src/hermes/brief/eval.py`)
-- Create: `src/hermes/pipeline/adapter.py` (from `src/hermes/brief/adapter.py`)
+- Create: `src/newsagent/pipeline/report.py` (from `src/newsagent/brief/report.py`)
+- Create: `src/newsagent/pipeline/eval.py` (from `src/newsagent/brief/eval.py`)
+- Create: `src/newsagent/pipeline/adapter.py` (from `src/newsagent/brief/adapter.py`)
 
 **Interfaces:**
 - `pipeline.report`: `resolve_citations`, `assemble_report`, `drop_empty_subheadings`, `AssembledReport`
@@ -630,39 +630,39 @@ Expected: 271 passed.
 - [ ] **Step 1: Copy `brief/report.py` and update imports**
 
 ```bash
-cp src/hermes/brief/report.py src/hermes/pipeline/report.py
+cp src/newsagent/brief/report.py src/newsagent/pipeline/report.py
 ```
 
-Edit `src/hermes/pipeline/report.py`. Replace:
+Edit `src/newsagent/pipeline/report.py`. Replace:
 
 ```python
-from hermes.brief.search import SearchResult
-from hermes.brief.spec import BriefSpec
+from newsagent.brief.search import SearchResult
+from newsagent.brief.spec import BriefSpec
 ```
 
 With:
 
 ```python
-from hermes.pipeline.search import SearchResult
-from hermes.pipeline.spec import BriefSpec
+from newsagent.pipeline.search import SearchResult
+from newsagent.pipeline.spec import BriefSpec
 ```
 
 - [ ] **Step 2: Copy `brief/eval.py` and update imports**
 
 ```bash
-cp src/hermes/brief/eval.py src/hermes/pipeline/eval.py
+cp src/newsagent/brief/eval.py src/newsagent/pipeline/eval.py
 ```
 
-Edit `src/hermes/pipeline/eval.py`. Replace:
+Edit `src/newsagent/pipeline/eval.py`. Replace:
 
 ```python
-from hermes.brief.spec import BriefSpec, parse_brief
+from newsagent.brief.spec import BriefSpec, parse_brief
 ```
 
 With:
 
 ```python
-from hermes.pipeline.spec import BriefSpec, parse_prompt
+from newsagent.pipeline.spec import BriefSpec, parse_prompt
 ```
 
 (The local `evaluate_report` still uses `parse_brief` internally — keep the alias for now and rewrite in Task 18.)
@@ -670,10 +670,10 @@ from hermes.pipeline.spec import BriefSpec, parse_prompt
 - [ ] **Step 3: Copy `brief/adapter.py` (no `brief.*` imports)**
 
 ```bash
-cp src/hermes/brief/adapter.py src/hermes/pipeline/adapter.py
+cp src/newsagent/brief/adapter.py src/newsagent/pipeline/adapter.py
 ```
 
-No import changes needed (only stdlib + `hermes.logging`).
+No import changes needed (only stdlib + `newsagent.logging`).
 
 - [ ] **Step 4: Run the test suite**
 
@@ -686,7 +686,7 @@ Expected: 271 passed.
 - [ ] **Step 5: Verify ruff clean**
 
 ```bash
-.venv/bin/python -m ruff check src/hermes/pipeline/report.py src/hermes/pipeline/eval.py src/hermes/pipeline/adapter.py
+.venv/bin/python -m ruff check src/newsagent/pipeline/report.py src/newsagent/pipeline/eval.py src/newsagent/pipeline/adapter.py
 ```
 
 ---
@@ -698,14 +698,14 @@ Expected: 271 passed.
 
 - [ ] **Step 1: Update imports**
 
-The test currently imports from `hermes.brief.*`. Replace every occurrence:
+The test currently imports from `newsagent.brief.*`. Replace every occurrence:
 
-- `from hermes.brief.spec import` → `from hermes.pipeline.spec import`
-- `from hermes.brief.planner import` → `from hermes.pipeline.planner import`
-- `from hermes.brief.search import` → `from hermes.pipeline.search import`
-- `from hermes.brief.synthesize import` → `from hermes.pipeline.synthesize import`
-- `from hermes.brief.report import` → `from hermes.pipeline.report import`
-- `from hermes.brief.run import` → `from hermes.pipeline.run import` (the orchestrator — same path, but rewritten in Task 12)
+- `from newsagent.brief.spec import` → `from newsagent.pipeline.spec import`
+- `from newsagent.brief.planner import` → `from newsagent.pipeline.planner import`
+- `from newsagent.brief.search import` → `from newsagent.pipeline.search import`
+- `from newsagent.brief.synthesize import` → `from newsagent.pipeline.synthesize import`
+- `from newsagent.brief.report import` → `from newsagent.pipeline.report import`
+- `from newsagent.brief.run import` → `from newsagent.pipeline.run import` (the orchestrator — same path, but rewritten in Task 12)
 
 (Read the file first to see what's there; the integration test may mock fewer imports.)
 
@@ -730,7 +730,7 @@ Expected: 271 passed.
 ### Task 11: Create the new orchestrator `pipeline/orchestrator.py`
 
 **Files:**
-- Create: `src/hermes/pipeline/orchestrator.py`
+- Create: `src/newsagent/pipeline/orchestrator.py`
 - Test: `tests/integration/test_news_run.py`
 
 **Interfaces:**
@@ -741,7 +741,7 @@ Expected: 271 passed.
 
 - [ ] **Step 1: Read the existing `brief/run.py` (the source of truth) to understand the full flow**
 
-Read `src/hermes/brief/run.py` (461 LoC) in full. Identify: imports, `_build_router`, `_gather_sources`, `_gather_sources_fallback`, `_CADENCE`, `_synthesize_section_parallel`, `run_brief_pipeline`, `_generate_section_queries`, `run_brief`.
+Read `src/newsagent/brief/run.py` (461 LoC) in full. Identify: imports, `_build_router`, `_gather_sources`, `_gather_sources_fallback`, `_CADENCE`, `_synthesize_section_parallel`, `run_brief_pipeline`, `_generate_section_queries`, `run_brief`.
 
 - [ ] **Step 2: Write the test for the orchestrator**
 
@@ -762,10 +762,10 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from hermes.config import HermesSettings
-from hermes.pipeline.orchestrator import FULL_COGNITION_MIN_SECTIONS, run_news_pipeline
-from hermes.pipeline.search import SearchResult
-from hermes.pipeline.spec import BriefSpec, SectionSpec
+from newsagent.config import NewsAgentSettings
+from newsagent.pipeline.orchestrator import FULL_COGNITION_MIN_SECTIONS, run_news_pipeline
+from newsagent.pipeline.search import SearchResult
+from newsagent.pipeline.spec import BriefSpec, SectionSpec
 
 
 SIMPLE_PROMPT = """# Test Report
@@ -817,7 +817,7 @@ def _fake_router(text: str = "synthesized prose") -> MagicMock:
     r.complete = AsyncMock()
     r.json_complete = AsyncMock(return_value={})
 
-    from hermes.llm.providers.base import ProviderResult
+    from newsagent.llm.providers.base import ProviderResult
 
     r.complete.return_value = ProviderResult(
         text=text, model="test", provider="test", prompt_tokens=10, completion_tokens=20
@@ -825,8 +825,8 @@ def _fake_router(text: str = "synthesized prose") -> MagicMock:
     return r
 
 
-def _make_settings(tmp_path: Path) -> HermesSettings:
-    s = HermesSettings()
+def _make_settings(tmp_path: Path) -> NewsAgentSettings:
+    s = NewsAgentSettings()
     s.storage.dir = tmp_path
     return s
 
@@ -859,7 +859,7 @@ async def test_orchestrator_writes_file_for_simple_prompt(tmp_path):
 @pytest.mark.asyncio
 async def test_orchestrator_short_prompt_skips_cognition_core():
     """Briefs with < 3 sections go straight to per-section synthesis (no cognition)."""
-    from hermes.pipeline import orchestrator
+    from newsagent.pipeline import orchestrator
 
     called = {"graph": False, "stories": False, "plan": False}
 
@@ -898,14 +898,14 @@ def test_threshold_constant_is_three():
 .venv/bin/python -m pytest tests/integration/test_news_run.py -q
 ```
 
-Expected: FAIL with `ModuleNotFoundError: hermes.pipeline.orchestrator`.
+Expected: FAIL with `ModuleNotFoundError: newsagent.pipeline.orchestrator`.
 
 - [ ] **Step 4: Implement the orchestrator (part 1 — the basic flow)**
 
-Create `src/hermes/pipeline/orchestrator.py`:
+Create `src/newsagent/pipeline/orchestrator.py`:
 
 ```python
-"""The unified Hermes orchestrator.
+"""The unified newsagent orchestrator.
 
 One command, one pipeline. Reads a parsed brief, plans queries, searches,
 optionally runs the cognition core (when the brief is deep enough), and
@@ -918,17 +918,17 @@ import asyncio
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from hermes.cadence import resolve_cadence  # placeholder; see note below
+from newsagent.cadence import resolve_cadence  # placeholder; see note below
 
 # NOTE: This orchestrator will be wired up in Task 12. The import path is
-# hermes.pipeline.cadence, but a re-export shim is provided at the package
+# newsagent.pipeline.cadence, but a re-export shim is provided at the package
 # level so the orchestrator can keep its import shallow.
 ```
 
-Wait — that's wrong. The cadence module is at `hermes.pipeline.cadence`, not `hermes.cadence`. Rewrite the import. Replace the file with this working version:
+Wait — that's wrong. The cadence module is at `newsagent.pipeline.cadence`, not `newsagent.cadence`. Rewrite the import. Replace the file with this working version:
 
 ```python
-"""The unified Hermes orchestrator.
+"""The unified newsagent orchestrator.
 
 One command, one pipeline. Reads a parsed brief, plans queries, searches,
 optionally runs the cognition core (when the brief has 3+ sections), and
@@ -946,20 +946,20 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from hermes.cadence import CADENCE, CadenceSpec, resolve_cadence
-from hermes.config import HermesSettings, load_settings
-from hermes.embedding import Embedder  # placeholder; see Step 5
-from hermes.logging import get_logger
-from hermes.llm.providers.registry import build_registry
-from hermes.llm.router import LLMRouter
-from hermes.output import build_sinks
-from hermes.pipeline.adapter import PromptAdapter
-from hermes.pipeline.planner import plan_queries
-from hermes.pipeline.report import assemble_report
-from hermes.pipeline.retrieval import embed_chunks, load_past_reports, retrieve_similar, format_rag_context
-from hermes.pipeline.search import SearchProvider, SearchResult, build_search_provider, dedup_sources
-from hermes.pipeline.spec import BriefSpec
-from hermes.pipeline.synthesize import (
+from newsagent.cadence import CADENCE, CadenceSpec, resolve_cadence
+from newsagent.config import NewsAgentSettings, load_settings
+from newsagent.embedding import Embedder  # placeholder; see Step 5
+from newsagent.logging import get_logger
+from newsagent.llm.providers.registry import build_registry
+from newsagent.llm.router import LLMRouter
+from newsagent.output import build_sinks
+from newsagent.pipeline.adapter import PromptAdapter
+from newsagent.pipeline.planner import plan_queries
+from newsagent.pipeline.report import assemble_report
+from newsagent.pipeline.retrieval import embed_chunks, load_past_reports, retrieve_similar, format_rag_context
+from newsagent.pipeline.search import SearchProvider, SearchResult, build_search_provider, dedup_sources
+from newsagent.pipeline.spec import BriefSpec
+from newsagent.pipeline.synthesize import (
     _content_word_count,
     _SECTION_MIN_WORDS,
     clean_section_text,
@@ -968,7 +968,7 @@ from hermes.pipeline.synthesize import (
     synthesize_section,
     synthesize_section_with_review,
 )
-from hermes.storage.db import Store
+from newsagent.storage.db import Store
 
 log = get_logger("orchestrator")
 
@@ -985,7 +985,7 @@ _FALLBACK_COLLECTORS = (
 )
 
 
-def _build_router(settings: HermesSettings) -> LLMRouter:
+def _build_router(settings: NewsAgentSettings) -> LLMRouter:
     registry = build_registry(
         ollama_base_url=settings.llm.ollama_base_url,
         ollama_api_key=settings.llm.ollama_api_key,
@@ -1029,7 +1029,7 @@ async def _gather_sources_fallback(
     max_sources: int,
 ) -> list[SearchResult]:
     """Pull from free collectors when Tavily returns nothing."""
-    from hermes.collectors.registry import run_collector
+    from newsagent.collectors.registry import run_collector
 
     out: list[SearchResult] = []
     for name in _FALLBACK_COLLECTORS:
@@ -1063,7 +1063,7 @@ async def _synthesize_section_parallel(
     router: LLMRouter,
     search: SearchProvider,
     spec: BriefSpec,
-    settings: HermesSettings,
+    settings: NewsAgentSettings,
     cad: CadenceSpec,
     date_label: str,
     cadence_note: str,
@@ -1075,9 +1075,9 @@ async def _synthesize_section_parallel(
     max_tokens: int = 5000,
 ) -> str:
     """Synthesize one section with RAG context + critic loop + CoT backstop."""
-    from hermes.brief.report import drop_empty_subheadings  # type: ignore[attr-defined]
-    from hermes.pipeline.sanitizer import sanitize_text
-    from hermes.pipeline.stages.section_writer import extract_prose
+    from newsagent.brief.report import drop_empty_subheadings  # type: ignore[attr-defined]
+    from newsagent.pipeline.sanitizer import sanitize_text
+    from newsagent.pipeline.stages.section_writer import extract_prose
 
     async with semaphore:
         rag_context = ""
@@ -1171,7 +1171,7 @@ async def _maybe_run_cognition_core(
         return None
     log.info("cognition.run", sections=len(spec.sections))
 
-    from hermes.pipeline.stages import (
+    from newsagent.pipeline.stages import (
         analyze_chief,
         build_evidence_graph,
         discover_stories,
@@ -1202,13 +1202,13 @@ async def _maybe_run_cognition_core(
 async def run_news_pipeline(
     spec: BriefSpec,
     *,
-    settings: HermesSettings | None = None,
+    settings: NewsAgentSettings | None = None,
     router: LLMRouter | None = None,
     search: SearchProvider | None = None,
     out_path: Path | None = None,
     brief_path: str | Path | None = None,
 ) -> Path:
-    """The one Hermes production command. Run a parsed brief end to end."""
+    """The one newsagent production command. Run a parsed brief end to end."""
     settings = settings or load_settings()
     cad = resolve_cadence(settings.cadence)
     router = router or _build_router(settings)
@@ -1276,7 +1276,7 @@ async def run_news_pipeline(
     report = assemble_report(spec, list(sections_md), sources)
 
     if out_path is None:
-        from hermes.pipeline.spec import brief_slug
+        from newsagent.pipeline.spec import brief_slug
 
         out_path = settings.reports_dir / f"{brief_slug(spec)}.md"
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1295,7 +1295,7 @@ async def run_news_pipeline(
     try:
         store = Store(settings.sqlite_url)
         await store.init()
-        from hermes.storage.models import Report
+        from newsagent.storage.models import Report
 
         async with store.session() as session:
             await session.merge(
@@ -1319,7 +1319,7 @@ async def run_news_pipeline(
 
 
 def _generate_section_queries(section, count: int, year: str) -> list:
-    from hermes.pipeline.planner import ResearchQuery
+    from newsagent.pipeline.planner import ResearchQuery
 
     queries = [ResearchQuery(f"{section.title} {year}", section.title, "section")]
     for bullet in section.bullets[:count]:
@@ -1329,9 +1329,9 @@ def _generate_section_queries(section, count: int, year: str) -> list:
 
 - [ ] **Step 5: Note about the `Embedder` import**
 
-The orchestrator uses `Embedder` from `hermes.llm.embed`. The import is correct: `from hermes.llm.embed import Embedder`. Fix the placeholder line. Replace the line `from hermes.embedding import Embedder  # placeholder; see Step 5` with `from hermes.llm.embed import Embedder`.
+The orchestrator uses `Embedder` from `newsagent.llm.embed`. The import is correct: `from newsagent.llm.embed import Embedder`. Fix the placeholder line. Replace the line `from newsagent.embedding import Embedder  # placeholder; see Step 5` with `from newsagent.llm.embed import Embedder`.
 
-Also fix the import `from hermes.brief.report import drop_empty_subheadings` — that should be `from hermes.pipeline.report import drop_empty_subheadings` (the module was moved in Task 9).
+Also fix the import `from newsagent.brief.report import drop_empty_subheadings` — that should be `from newsagent.pipeline.report import drop_empty_subheadings` (the module was moved in Task 9).
 
 - [ ] **Step 6: Run the new orchestrator test**
 
@@ -1352,7 +1352,7 @@ Expected: 274 passed (271 + 3 new).
 - [ ] **Step 8: Verify ruff clean**
 
 ```bash
-.venv/bin/python -m ruff check src/hermes/pipeline/orchestrator.py
+.venv/bin/python -m ruff check src/newsagent/pipeline/orchestrator.py
 ```
 
 ---
@@ -1360,7 +1360,7 @@ Expected: 274 passed (271 + 3 new).
 ### Task 12: Replace `pipeline/run.py` with a 5-line shim that calls the orchestrator
 
 **Files:**
-- Modify: `src/hermes/pipeline/run.py` (replace the entire 653-line file with a shim)
+- Modify: `src/newsagent/pipeline/run.py` (replace the entire 653-line file with a shim)
 
 - [ ] **Step 1: Read the existing `pipeline/run.py` (653 LoC)**
 
@@ -1368,17 +1368,17 @@ This is the **old daily-path** orchestrator. We're replacing it with a shim. The
 
 - [ ] **Step 2: Write the shim**
 
-Replace `src/hermes/pipeline/run.py` with:
+Replace `src/newsagent/pipeline/run.py` with:
 
 ```python
 """Compatibility shim. The new orchestrator lives in
-:mod:`hermes.pipeline.orchestrator`. This file will be deleted in Task 18.
+:mod:`newsagent.pipeline.orchestrator`. This file will be deleted in Task 18.
 """
 
 from __future__ import annotations
 
 # Re-export the new entry point so old imports keep working during migration.
-from hermes.pipeline.orchestrator import run_news_pipeline as _run  # noqa: F401
+from newsagent.pipeline.orchestrator import run_news_pipeline as _run  # noqa: F401
 ```
 
 - [ ] **Step 3: Run the full suite**
@@ -1392,7 +1392,7 @@ Expected: 274 passed. (The old integration test `test_pipeline.py` was the only 
 - [ ] **Step 4: Verify ruff clean**
 
 ```bash
-.venv/bin/python -m ruff check src/hermes/pipeline/run.py
+.venv/bin/python -m ruff check src/newsagent/pipeline/run.py
 ```
 
 ---
@@ -1416,7 +1416,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from hermes.llm.embed import Embedder
+from newsagent.llm.embed import Embedder
 
 
 def test_hashing_embedder_shape():
@@ -1480,9 +1480,9 @@ Create `tests/unit/test_synthesize.py`:
 
 from __future__ import annotations
 
-from hermes.pipeline.search import SearchResult
-from hermes.pipeline.spec import SectionSpec
-from hermes.pipeline.synthesize import (
+from newsagent.pipeline.search import SearchResult
+from newsagent.pipeline.spec import SectionSpec
+from newsagent.pipeline.synthesize import (
     _content_word_count,
     clean_section_text,
     count_citations,
@@ -1606,9 +1606,9 @@ Read `tests/unit/test_brief_citations.py` (20 KB). Identify which tests cover ci
 Open the existing `test_brief_citations.py`. Copy the `TestResolveCitations` and `TestAssembleReport` and `TestDropEmptySubheadings` test classes. Update imports:
 
 ```python
-from hermes.pipeline.report import resolve_citations, assemble_report, drop_empty_subheadings
-from hermes.pipeline.search import SearchResult
-from hermes.pipeline.spec import BriefSpec, SectionSpec
+from newsagent.pipeline.report import resolve_citations, assemble_report, drop_empty_subheadings
+from newsagent.pipeline.search import SearchResult
+from newsagent.pipeline.spec import BriefSpec, SectionSpec
 ```
 
 Save as `tests/unit/test_report.py`.
@@ -1618,8 +1618,8 @@ Save as `tests/unit/test_report.py`.
 Open the existing `test_brief_citations.py`. Copy the `TestEvaluateText` test class. Update imports:
 
 ```python
-from hermes.pipeline.eval import EvalVerdict, evaluate_text
-from hermes.pipeline.spec import BriefSpec
+from newsagent.pipeline.eval import EvalVerdict, evaluate_text
+from newsagent.pipeline.spec import BriefSpec
 ```
 
 The test uses a mocked router. Save as `tests/unit/test_eval.py`.
@@ -1644,7 +1644,7 @@ rm tests/unit/test_brief_citations.py
 mv tests/unit/test_brief_planner.py tests/unit/test_planner.py
 ```
 
-Edit `tests/unit/test_planner.py` and update its imports from `hermes.brief.planner` to `hermes.pipeline.planner`.
+Edit `tests/unit/test_planner.py` and update its imports from `newsagent.brief.planner` to `newsagent.pipeline.planner`.
 
 - [ ] **Step 7: Run full suite**
 
@@ -1665,14 +1665,14 @@ Expected: 286 passed (same total, just renamed).
 ### Task 16: Delete the legacy `analyzers/`, `renderers/`, and 4 pipeline modules
 
 **Files:**
-- Delete: `src/hermes/analyzers/` (entire package)
-- Delete: `src/hermes/renderers/` (entire package)
-- Delete: `src/hermes/pipeline/cluster.py`
-- Delete: `src/hermes/pipeline/rank.py`
-- Delete: `src/hermes/pipeline/planning.py`
-- Delete: `src/hermes/pipeline/research.py`
-- Delete: `src/hermes/pipeline/quality_gates.py`
-- Delete: `src/hermes/pipeline/prioritize.py`
+- Delete: `src/newsagent/analyzers/` (entire package)
+- Delete: `src/newsagent/renderers/` (entire package)
+- Delete: `src/newsagent/pipeline/cluster.py`
+- Delete: `src/newsagent/pipeline/rank.py`
+- Delete: `src/newsagent/pipeline/planning.py`
+- Delete: `src/newsagent/pipeline/research.py`
+- Delete: `src/newsagent/pipeline/quality_gates.py`
+- Delete: `src/newsagent/pipeline/prioritize.py`
 - Delete: `tests/unit/test_quality_gates.py`
 - Delete: `tests/integration/test_pipeline.py`
 
@@ -1691,9 +1691,9 @@ Expected: `No imports.` (All callers should have been updated in earlier tasks.)
 - [ ] **Step 2: Delete the files**
 
 ```bash
-rm -rf src/hermes/analyzers/
-rm -rf src/hermes/renderers/
-rm -f src/hermes/pipeline/cluster.py src/hermes/pipeline/rank.py src/hermes/pipeline/planning.py src/hermes/pipeline/research.py src/hermes/pipeline/quality_gates.py src/hermes/pipeline/prioritize.py
+rm -rf src/newsagent/analyzers/
+rm -rf src/newsagent/renderers/
+rm -f src/newsagent/pipeline/cluster.py src/newsagent/pipeline/rank.py src/newsagent/pipeline/planning.py src/newsagent/pipeline/research.py src/newsagent/pipeline/quality_gates.py src/newsagent/pipeline/prioritize.py
 rm -f tests/unit/test_quality_gates.py tests/integration/test_pipeline.py
 ```
 
@@ -1716,7 +1716,7 @@ Expected: 286 passed (or 285 — confirm the count).
 ### Task 17: Update `cli.py` — remove `run`, `backfill`, `research`; rename `news` flags
 
 **Files:**
-- Modify: `src/hermes/cli.py`
+- Modify: `src/newsagent/cli.py`
 
 **Interfaces:**
 - Commands: `news`, `status`, `sources`, `models`, `profiles`, `eval`, `quality`, `help`
@@ -1725,12 +1725,12 @@ Expected: 286 passed (or 285 — confirm the count).
 
 - [ ] **Step 1: Rewrite the CLI**
 
-The full new `src/hermes/cli.py` (replaces the existing 425-line file):
+The full new `src/newsagent/cli.py` (replaces the existing 425-line file):
 
 ```python
-"""Hermes CLI: one production command, four inspection tools.
+"""newsagent CLI: one production command, four inspection tools.
 
-Production: ``hermes news <prompt.md>`` — the unified pipeline.
+Production: ``newsagent news <prompt.md>`` — the unified pipeline.
 Inspection: ``status``, ``sources``, ``models``, ``profiles``.
 Post-hoc:   ``eval <report.md> --prompt <prompt.md>``, ``quality [--date]``.
 """
@@ -1741,22 +1741,22 @@ import asyncio
 import sys
 from datetime import datetime, timezone
 
-from hermes.config import load_settings
-from hermes.logging import configure_logging, get_logger
+from newsagent.config import load_settings
+from newsagent.logging import configure_logging, get_logger
 
 log = get_logger("cli")
 
-HELP = """Hermes — autonomous AI Research Intelligence Agent (CLI only)
+HELP = """newsagent — autonomous AI Research Intelligence Agent (CLI only)
 
 Usage:
-  hermes news <prompt.md>           # The one production command
-  hermes eval <report.md> --prompt <prompt.md> [--cadence daily|weekly|monthly] [--rate 1-5]
-  hermes quality [--date YYYY-MM-DD]
-  hermes profiles
-  hermes status
-  hermes models
-  hermes sources
-  hermes help
+  newsagent news <prompt.md>           # The one production command
+  newsagent eval <report.md> --prompt <prompt.md> [--cadence daily|weekly|monthly] [--rate 1-5]
+  newsagent quality [--date YYYY-MM-DD]
+  newsagent profiles
+  newsagent status
+  newsagent models
+  newsagent sources
+  newsagent help
 """
 
 
@@ -1811,11 +1811,11 @@ def main(argv: list[str] | None = None) -> int:
 def _cmd_news(settings, args) -> int:
     from pathlib import Path
 
-    from hermes.pipeline.orchestrator import run_news_pipeline
-    from hermes.pipeline.spec import parse_prompt
+    from newsagent.pipeline.orchestrator import run_news_pipeline
+    from newsagent.pipeline.spec import parse_prompt
 
     if not args["positionals"]:
-        print("news requires a prompt file, e.g. hermes news example_prompt.md", file=sys.stderr)
+        print("news requires a prompt file, e.g. newsagent news example_prompt.md", file=sys.stderr)
         return 1
     brief_path = Path(args["positionals"][0])
     if not brief_path.exists():
@@ -1840,14 +1840,14 @@ def _cmd_news(settings, args) -> int:
 def _cmd_eval(settings, args) -> int:
     from pathlib import Path
 
-    from hermes.llm.providers.registry import build_registry
-    from hermes.llm.router import LLMRouter
-    from hermes.pipeline.adapter import PromptAdapter
-    from hermes.pipeline.eval import evaluate_report, get_rolling_scores
-    from hermes.storage.db import Store
+    from newsagent.llm.providers.registry import build_registry
+    from newsagent.llm.router import LLMRouter
+    from newsagent.pipeline.adapter import PromptAdapter
+    from newsagent.pipeline.eval import evaluate_report, get_rolling_scores
+    from newsagent.storage.db import Store
 
     if not args["positionals"]:
-        print("eval requires a report file, e.g. hermes eval report.md --prompt prompt.md", file=sys.stderr)
+        print("eval requires a report file, e.g. newsagent eval report.md --prompt prompt.md", file=sys.stderr)
         return 1
     report_path = Path(args["positionals"][0])
     prompt_path_opt = args["opts"].get("prompt")
@@ -1939,9 +1939,9 @@ def _cmd_eval(settings, args) -> int:
 
 
 def _cmd_quality(settings, args) -> int:
-    from hermes.pipeline.quality import run_quality
-    from hermes.pipeline.run import _make_ctx
-    from hermes.storage.db import Store
+    from newsagent.pipeline.quality import run_quality
+    from newsagent.pipeline.run import _make_ctx
+    from newsagent.storage.db import Store
 
     date_str = args["opts"].get("date")
     run_date = _parse_date(date_str) if date_str else datetime.now(timezone.utc)
@@ -1951,7 +1951,7 @@ def _cmd_quality(settings, args) -> int:
     ctx.run_date = run_date
     try:
         rep = asyncio.run(run_quality(ctx, run_date, settings))
-        print(f"Quality self-score: {rep.hermes_score}/5")
+        print(f"Quality self-score: {rep.newsagent_score}/5")
         print(f"Dimensions: {rep.per_dimension}")
         print(f"Improvement notes: {len(rep.notes)}")
         print(f"Report: {rep.path}")
@@ -1966,7 +1966,7 @@ def _cmd_quality(settings, args) -> int:
 
 def _cmd_profiles(settings) -> int:
     """Profiles are still defined (daily/weekly/minimal/etc.) but only their names show — no top_k."""
-    from hermes.profiles import PROFILES
+    from newsagent.profiles import PROFILES
 
     print("Available report profiles:")
     for name, p in PROFILES.items():
@@ -1977,8 +1977,8 @@ def _cmd_profiles(settings) -> int:
 def _cmd_status(settings) -> int:
     from sqlalchemy import select
 
-    from hermes.storage.db import Store
-    from hermes.storage.models import Item, Report, ReportEval
+    from newsagent.storage.db import Store
+    from newsagent.storage.models import Item, Report, ReportEval
 
     async def _go():
         store = Store(settings.sqlite_url)
@@ -2014,12 +2014,12 @@ def _cmd_status(settings) -> int:
 
 
 def _cmd_models(settings) -> int:
-    from hermes.llm.catalog import OLLAMA_CATALOG, OPENCODE_GO_CATALOG
+    from newsagent.llm.catalog import OLLAMA_CATALOG, OPENCODE_GO_CATALOG
 
     backend = settings.llm.backend
 
     if backend == "opencode_go":
-        from hermes.llm.providers.opencode_go import OpenCodeGoProvider
+        from newsagent.llm.providers.opencode_go import OpenCodeGoProvider
 
         provider = OpenCodeGoProvider(
             base_url=settings.llm.opencode_go_base_url,
@@ -2039,13 +2039,13 @@ def _cmd_models(settings) -> int:
             for m in sorted(available):
                 print(f"  - {m}")
 
-        print("\nCurated catalog tiers (hermes/llm/catalog.py):")
+        print("\nCurated catalog tiers (newsagent/llm/catalog.py):")
         for tier, chain in OPENCODE_GO_CATALOG.items():
             marks = " ".join(("✓" if c in available else "·") for c in chain)
             print(f"  [{tier}] {' > '.join(chain)}   ({marks})")
         print("\n✓ = present on endpoint · = not found (will 404 / fall back).")
     else:
-        from hermes.llm.providers.ollama import OllamaProvider
+        from newsagent.llm.providers.ollama import OllamaProvider
 
         provider = OllamaProvider(
             base_url=settings.llm.ollama_base_url,
@@ -2065,7 +2065,7 @@ def _cmd_models(settings) -> int:
             for m in sorted(available):
                 print(f"  - {m}")
 
-        print("\nCurated catalog tiers (hermes/llm/catalog.py):")
+        print("\nCurated catalog tiers (newsagent/llm/catalog.py):")
         for tier, chain in OLLAMA_CATALOG.items():
             marks = " ".join(("✓" if c in available else "·") for c in chain)
             print(f"  [{tier}] {' > '.join(chain)}   ({marks})")
@@ -2075,7 +2075,7 @@ def _cmd_models(settings) -> int:
 
 
 def _cmd_sources(settings) -> int:
-    from hermes.collectors.registry import REGISTRY, get_collector
+    from newsagent.collectors.registry import REGISTRY, get_collector
 
     print("Available collectors:")
     for name in sorted(REGISTRY):
@@ -2106,7 +2106,7 @@ if __name__ == "__main__":
 
 - [ ] **Step 2: Update `test_cli.py` to test only the surviving subcommands**
 
-Edit `tests/unit/test_cli.py` (4883 bytes). Remove any tests for `run`, `backfill`, `research`. Add a test that `hermes news <prompt.md>` is recognized and dispatched.
+Edit `tests/unit/test_cli.py` (4883 bytes). Remove any tests for `run`, `backfill`, `research`. Add a test that `newsagent news <prompt.md>` is recognized and dispatched.
 
 - [ ] **Step 3: Run the full suite**
 
@@ -2119,7 +2119,7 @@ Expected: 286 passed.
 - [ ] **Step 4: Verify the CLI parses correctly**
 
 ```bash
-.venv/bin/python -c "from hermes.cli import _parse_args; print(_parse_args(['news', 'example_prompt.md']))"
+.venv/bin/python -c "from newsagent.cli import _parse_args; print(_parse_args(['news', 'example_prompt.md']))"
 ```
 
 Expected: `{'command': 'news', 'flags': {}, 'opts': {}, 'positionals': ['example_prompt.md']}`.
@@ -2127,7 +2127,7 @@ Expected: `{'command': 'news', 'flags': {}, 'opts': {}, 'positionals': ['example
 - [ ] **Step 5: Verify ruff clean**
 
 ```bash
-.venv/bin/python -m ruff check src/hermes/cli.py
+.venv/bin/python -m ruff check src/newsagent/cli.py
 ```
 
 ---
@@ -2135,9 +2135,9 @@ Expected: `{'command': 'news', 'flags': {}, 'opts': {}, 'positionals': ['example
 ### Task 18: Delete the old `brief/` package and `pipeline/run.py` shim
 
 **Files:**
-- Delete: `src/hermes/brief/` (entire package)
-- Delete: `src/hermes/pipeline/run.py` (the shim is no longer needed)
-- Update: `src/hermes/pipeline/eval.py` (use `parse_prompt` instead of the `parse_brief` alias)
+- Delete: `src/newsagent/brief/` (entire package)
+- Delete: `src/newsagent/pipeline/run.py` (the shim is no longer needed)
+- Update: `src/newsagent/pipeline/eval.py` (use `parse_prompt` instead of the `parse_brief` alias)
 
 - [ ] **Step 1: Verify no remaining imports of `brief.*` or `pipeline.run`**
 
@@ -2153,17 +2153,17 @@ Expected: `No imports.`
 
 - [ ] **Step 2: Drop the `parse_brief` alias from `pipeline/spec.py`**
 
-Edit `src/hermes/pipeline/spec.py`. Remove the line `parse_brief = parse_prompt` (the temporary alias from Task 1).
+Edit `src/newsagent/pipeline/spec.py`. Remove the line `parse_brief = parse_prompt` (the temporary alias from Task 1).
 
 - [ ] **Step 3: Update `pipeline/eval.py` to use `parse_prompt`**
 
-Edit `src/hermes/pipeline/eval.py`. Replace `parse_brief` with `parse_prompt` in the import line and the call site.
+Edit `src/newsagent/pipeline/eval.py`. Replace `parse_brief` with `parse_prompt` in the import line and the call site.
 
 - [ ] **Step 4: Delete the files**
 
 ```bash
-rm -rf src/hermes/brief/
-rm -f src/hermes/pipeline/run.py
+rm -rf src/newsagent/brief/
+rm -f src/newsagent/pipeline/run.py
 ```
 
 - [ ] **Step 5: Run the full suite**
@@ -2190,7 +2190,7 @@ Expected: 286 passed.
 - Modify: `scheduler/systemd.service`
 - Modify: `scheduler/systemd.timer`
 
-- [ ] **Step 1: Read each scheduler file to find the `hermes run` invocation**
+- [ ] **Step 1: Read each scheduler file to find the `newsagent run` invocation**
 
 ```bash
 grep -nE 'hermes (run|backfill|research)' scheduler/*
@@ -2198,22 +2198,22 @@ grep -nE 'hermes (run|backfill|research)' scheduler/*
 
 - [ ] **Step 2: Update `launchd.plist`**
 
-Find the `hermes run` line and replace with:
+Find the `newsagent run` line and replace with:
 
 ```xml
 <string>news</string>
-<string>/path/to/hermes/prompts/ai_news_daily.md</string>
+<string>/path/to/newsagent/prompts/ai_news_daily.md</string>
 ```
 
 (Use the absolute path to the daily prompt.)
 
 - [ ] **Step 3: Update `cron.txt`**
 
-Find the `hermes run` line and replace with `hermes news /path/to/hermes/prompts/ai_news_daily.md`.
+Find the `newsagent run` line and replace with `newsagent news /path/to/newsagent/prompts/ai_news_daily.md`.
 
 - [ ] **Step 4: Update `systemd.service` and `systemd.timer`**
 
-Same change: `ExecStart=hermes news /path/to/hermes/prompts/ai_news_daily.md`.
+Same change: `ExecStart=newsagent news /path/to/newsagent/prompts/ai_news_daily.md`.
 
 - [ ] **Step 5: Verify ruff clean**
 
@@ -2239,7 +2239,7 @@ Same change: `ExecStart=hermes news /path/to/hermes/prompts/ai_news_daily.md`.
 
 - [ ] **Step 1: Update `README.md`**
 
-In the "Quickstart" section, change `hermes run` to `hermes news example_prompt.md`. Update the "CLI commands" table to drop `run`, `backfill`, `research` and add a one-line description for `news`. Update the architecture diagram to show one pipeline.
+In the "Quickstart" section, change `newsagent run` to `newsagent news example_prompt.md`. Update the "CLI commands" table to drop `run`, `backfill`, `research` and add a one-line description for `news`. Update the architecture diagram to show one pipeline.
 
 - [ ] **Step 2: Add a "Pipeline unification" entry to `CHANGELOG.md`**
 
@@ -2248,18 +2248,18 @@ Prepend to the top of the changelog (under the Unreleased header):
 ```markdown
 ### Pipeline unification (2026-07-13)
 
-The two-pipeline structure (daily `hermes run` + brief `hermes news`) collapses
+The two-pipeline structure (daily `newsagent run` + brief `newsagent news`) collapses
 into a single, brief-driven pipeline.
 
-- **Removed subcommands:** `hermes run`, `hermes backfill`, `hermes research`.
+- **Removed subcommands:** `newsagent run`, `newsagent backfill`, `newsagent research`.
 - **Removed CLI flags:** `--daily`, `--weekly`, `--monthly`, `--rate` on `news`.
-  Cadence is configured via `HERMES_CADENCE` in `.env`; `--rate 1-5` moved to
-  `hermes eval --rate 1-5`.
-- **Removed files:** `src/hermes/brief/`, `src/hermes/analyzers/`,
-  `src/hermes/renderers/`, `src/hermes/pipeline/cluster.py`, `rank.py`,
+  Cadence is configured via `NEWSAGENT_CADENCE` in `.env`; `--rate 1-5` moved to
+  `newsagent eval --rate 1-5`.
+- **Removed files:** `src/newsagent/brief/`, `src/newsagent/analyzers/`,
+  `src/newsagent/renderers/`, `src/newsagent/pipeline/cluster.py`, `rank.py`,
   `planning.py`, `research.py`, `quality_gates.py`, `prioritize.py`.
 - **Slimmed settings:** `PipelineConfig` (8 fields dropped), `SearchConfig`
-  (6 fields dropped), `HERMES_CADENCE` added.
+  (6 fields dropped), `NEWSAGENT_CADENCE` added.
 - **Optional cognition core:** briefs with 3+ sections run the artifact-passing
   cognition stages (`discover_stories` → `plan_research` → `analyze_chief` →
   `edit_story`); shallow briefs (1-2 sections) go straight to per-section
@@ -2290,7 +2290,7 @@ into a single, brief-driven pipeline.
 
 - [ ] **Step 5: Update `docs/CONFIGURATION.md`**
 
-Remove the entries for the deleted env vars (`HERMES_PIPELINE_SELF_CRITIQUE`, `HERMES_PIPELINE_RAG_WRITING`, `HERMES_PIPELINE_RESEARCH_LOOPS`, `HERMES_PIPELINE_CRITIC_MAX_CHARS`, `HERMES_PIPELINE_ANALYZE_MAX_CHARS`, `HERMES_PIPELINE_PRIORITIZER_*`, `HERMES_SEARCH_MAX_RESULTS`, `HERMES_SEARCH_SEARCH_DEPTH`, `HERMES_SEARCH_TOPIC`, `HERMES_SEARCH_INCLUDE_RAW_CONTENT`, `HERMES_SEARCH_MAX_SOURCES`, `HERMES_SEARCH_PER_SECTION_SOURCES`). Add `HERMES_CADENCE` with the three valid values.
+Remove the entries for the deleted env vars (`NEWSAGENT_PIPELINE_SELF_CRITIQUE`, `NEWSAGENT_PIPELINE_RAG_WRITING`, `NEWSAGENT_PIPELINE_RESEARCH_LOOPS`, `NEWSAGENT_PIPELINE_CRITIC_MAX_CHARS`, `NEWSAGENT_PIPELINE_ANALYZE_MAX_CHARS`, `NEWSAGENT_PIPELINE_PRIORITIZER_*`, `NEWSAGENT_SEARCH_MAX_RESULTS`, `NEWSAGENT_SEARCH_SEARCH_DEPTH`, `NEWSAGENT_SEARCH_TOPIC`, `NEWSAGENT_SEARCH_INCLUDE_RAW_CONTENT`, `NEWSAGENT_SEARCH_MAX_SOURCES`, `NEWSAGENT_SEARCH_PER_SECTION_SOURCES`). Add `NEWSAGENT_CADENCE` with the three valid values.
 
 - [ ] **Step 6: Update `docs/CLI.md`**
 
@@ -2312,7 +2312,7 @@ Add a one-paragraph note: "The KG tables (`entities`, `relationships`, `entity_a
 
 - [ ] **Step 8: Delete `docs/BRIEF.md`**
 
-The content is now in `docs/PIPELINE.md` and `docs/CONFIGURATION.md`. Keep `docs/HERMES_DESIGN.md` and `docs/COGNITION_DESIGN.md` as historical references.
+The content is now in `docs/PIPELINE.md` and `docs/CONFIGURATION.md`. Keep `docs/NEWSAGENT_DESIGN.md` and `docs/COGNITION_DESIGN.md` as historical references.
 
 ```bash
 rm docs/BRIEF.md
@@ -2347,7 +2347,7 @@ Expected: 286 passed.
 - §4 (error handling): Task 11 (every place where `except Exception` is caught, logged, and a placeholder/empty result is used).
 - §5.1 (PipelineConfig slimmed): Task 4.
 - §5.2 (SearchConfig slimmed): Task 4.
-- §5.3 (`HERMES_CADENCE` env var): Task 3 + Task 5.
+- §5.3 (`NEWSAGENT_CADENCE` env var): Task 3 + Task 5.
 - §5.4 (removed env vars): Task 4 + Task 20 (CONFIGURATION.md).
 - §6.1 (whole directories deleted): Task 16 + Task 18.
 - §6.2 (functions/classes to delete): Task 16 (`quality_gates`, `prioritize`, `metrics.log_summary`).
@@ -2378,7 +2378,7 @@ Expected: 286 passed.
 ### Plan gaps
 
 - The spec says "All legacy/fallback code is deleted." Task 16 + Task 18 cover this.
-- The spec says "the launchd plist runs `hermes news <prompt.md>` once a day." Task 19 covers this.
+- The spec says "the launchd plist runs `newsagent news <prompt.md>` once a day." Task 19 covers this.
 - The spec says "250-280 tests pass." Task 20's final count is 286 (slightly over) — within the spirit of the spec.
 - The spec mentions "rewrite `BriefSpec` parsing for the new `parse_prompt`" but the underlying logic doesn't change. Task 1's rename is sufficient.
 

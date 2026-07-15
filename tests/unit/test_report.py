@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import pytest
 
-from hermes.pipeline.report import assemble_report, drop_empty_subheadings, resolve_citations
-from hermes.pipeline.search import SearchResult
-from hermes.pipeline.spec import BriefSpec, SectionSpec
+from newsagent.pipeline.report import assemble_report, drop_empty_subheadings, resolve_citations
+from newsagent.pipeline.search import SearchResult
+from newsagent.pipeline.spec import BriefSpec, SectionSpec
 
 
 def _sources():
@@ -154,7 +154,7 @@ class TestCitationDiscipline:
     """
 
     def test_audit_counts_cited_sentences(self):
-        from hermes.pipeline.report import audit_citation_discipline
+        from newsagent.pipeline.report import audit_citation_discipline
         body = (
             "OpenAI released a new model [src:https://x/1]. "
             "The model achieves 92% on MMLU [src:https://x/2]. "
@@ -166,7 +166,7 @@ class TestCitationDiscipline:
         assert out["unmarked"] == 1
 
     def test_audit_counts_unsourced_tagged_sentences(self):
-        from hermes.pipeline.report import audit_citation_discipline
+        from newsagent.pipeline.report import audit_citation_discipline
         body = (
             "LangSmith was launched by LangChain in 2023 [unsourced — industry knowledge]. "
             "RAGAS is an open-source RAG evaluation framework [unsourced — industry knowledge]."
@@ -177,7 +177,7 @@ class TestCitationDiscipline:
         assert out["unmarked"] == 0
 
     def test_audit_handles_mixed(self):
-        from hermes.pipeline.report import audit_citation_discipline
+        from newsagent.pipeline.report import audit_citation_discipline
         body = (
             "OpenAI released a new model [src:https://x/1]. "
             "LangSmith is a paid product [unsourced — industry knowledge]. "
@@ -193,8 +193,8 @@ class TestCitationDiscipline:
         """The writer prompt must explicitly tell the model to mark unsourced
         claims so the audit pass can count them. Otherwise audit_citation_discipline
         returns 0 unsourced for everything (false reassurance)."""
-        from hermes.pipeline.synthesize import build_section_prompt
-        from hermes.pipeline.spec import SectionSpec
+        from newsagent.pipeline.synthesize import build_section_prompt
+        from newsagent.pipeline.spec import SectionSpec
         sec = SectionSpec(number=3, title="Frontier Models", bullets=["release dates"])
         prompt = build_section_prompt(sec, [], "instructions", ["quality"], "July 2026")
         assert "unsourced" in prompt.lower()
@@ -219,7 +219,7 @@ class TestRequiredDeliverablesGate:
         # Coverage Check" tail that named the missing items AFTER the report
         # was already on disk. With the pre-write gate, the report is refused
         # before writing, so assemble_report no longer appends that tail.
-        from hermes.pipeline.spec import BriefSpec, SectionSpec
+        from newsagent.pipeline.spec import BriefSpec, SectionSpec
         spec = BriefSpec(
             title="T",
             sections=[SectionSpec(number=1, title="Exec")],
@@ -233,7 +233,7 @@ class TestRequiredDeliverablesGate:
         assert "Required Deliverables — Coverage Check" not in rep.text
 
     def test_no_coverage_check_when_all_deliverables_present(self):
-        from hermes.pipeline.spec import BriefSpec, SectionSpec
+        from newsagent.pipeline.spec import BriefSpec, SectionSpec
         spec = BriefSpec(
             title="T",
             sections=[SectionSpec(number=1, title="Exec")],
@@ -245,7 +245,7 @@ class TestRequiredDeliverablesGate:
         assert "Coverage Check" not in rep.text
 
     def test_check_required_deliverables_returns_structured(self):
-        from hermes.pipeline.report import check_required_deliverables
+        from newsagent.pipeline.report import check_required_deliverables
         checks = check_required_deliverables(
             ["Model comparison matrix", "Nonexistent thing"],
             "## **1. Exec**\nThis has a model comparison matrix.\n\n| Model | Score |\n|---|---|\n",
@@ -256,7 +256,7 @@ class TestRequiredDeliverablesGate:
         assert checks[1].deliverable == "Nonexistent thing"
 
     def test_gate_required_deliverables_passes_when_all_present(self):
-        from hermes.pipeline.report import gate_required_deliverables
+        from newsagent.pipeline.report import gate_required_deliverables
         # No raise when every deliverable is in the report.
         gate_required_deliverables(
             ["Model comparison matrix", "Executive summary"],
@@ -264,8 +264,8 @@ class TestRequiredDeliverablesGate:
         )
 
     def test_gate_required_deliverables_raises_on_missing(self):
-        from hermes.errors import PipelineRefusedError
-        from hermes.pipeline.report import gate_required_deliverables
+        from newsagent.errors import PipelineRefusedError
+        from newsagent.pipeline.report import gate_required_deliverables
         with pytest.raises(PipelineRefusedError) as excinfo:
             gate_required_deliverables(
                 ["Model comparison matrix", "Funding tables"],
@@ -278,7 +278,7 @@ class TestRequiredDeliverablesGate:
         # one we know to be missing — order is not guaranteed.
 
     def test_gate_required_deliverables_no_op_when_list_empty(self):
-        from hermes.pipeline.report import gate_required_deliverables
+        from newsagent.pipeline.report import gate_required_deliverables
         # Empty list → no raise, no work.
         gate_required_deliverables([], "any text at all")
         gate_required_deliverables(None, "any text at all")
@@ -291,7 +291,7 @@ class TestRequiredDeliverablesGate:
         # the direct-substring fallback required the literal phrase to appear.
         # A report that *has* a comparison table + a benchmarks table + a
         # funding table + key stats + strategic conclusions must pass the gate.
-        from hermes.pipeline.report import gate_required_deliverables
+        from newsagent.pipeline.report import gate_required_deliverables
 
         real_brief_deliverables = [
             "Executive summary",
@@ -337,7 +337,7 @@ class TestRequiredDeliverablesGate:
         # Direct test of the structured check: "Model and silicon comparison
         # tables" must be detected as found when the report contains a markdown
         # table with model-related columns. The exact phrase will not appear.
-        from hermes.pipeline.report import check_required_deliverables
+        from newsagent.pipeline.report import check_required_deliverables
         checks = check_required_deliverables(
             ["Model and silicon comparison tables"],
             (
@@ -358,7 +358,7 @@ class TestRequiredDeliverablesGate:
         # (singular). The fix must still find a funding-shaped table in the
         # report, even though the brief's deliverable text uses a different
         # surface form.
-        from hermes.pipeline.report import check_required_deliverables
+        from newsagent.pipeline.report import check_required_deliverables
         checks = check_required_deliverables(
             ["Funding tables"],
             (
@@ -375,7 +375,7 @@ class TestRequiredDeliverablesGate:
         )
 
     def test_check_required_deliverables_finds_benchmark_table(self):
-        from hermes.pipeline.report import check_required_deliverables
+        from newsagent.pipeline.report import check_required_deliverables
         checks = check_required_deliverables(
             ["Benchmark comparison tables"],
             (
@@ -395,7 +395,7 @@ class TestRequiredDeliverablesGate:
         # "Key statistics" — no keyword group, no literal phrase in the report.
         # The fix must catch a section that *labels* itself with "Key Statistics"
         # or contains an obviously statistical table.
-        from hermes.pipeline.report import check_required_deliverables
+        from newsagent.pipeline.report import check_required_deliverables
         checks = check_required_deliverables(
             ["Key statistics"],
             (
@@ -412,7 +412,7 @@ class TestRequiredDeliverablesGate:
     def test_check_required_deliverables_still_rejects_bare_missing(self):
         # Regression guard: a truly absent deliverable must still be reported
         # missing. The looser matcher must not become a rubber-stamp.
-        from hermes.pipeline.report import check_required_deliverables
+        from newsagent.pipeline.report import check_required_deliverables
         checks = check_required_deliverables(
             ["Model and silicon comparison tables"],
             "## **1. Summary**\nJust prose, no tables, no model names.",
@@ -429,9 +429,9 @@ class TestThinCorpusBanner:
     banner distinguishes 'nothing happened' from 'we didn't see anything'."""
 
     def test_thin_corpus_banner_emitted_when_few_sources(self):
-        from hermes.pipeline.coverage import CoverageVerdict
-        from hermes.pipeline.report import assemble_report
-        from hermes.pipeline.spec import BriefSpec, SectionSpec
+        from newsagent.pipeline.coverage import CoverageVerdict
+        from newsagent.pipeline.report import assemble_report
+        from newsagent.pipeline.spec import BriefSpec, SectionSpec
         spec = BriefSpec(
             title="T",
             sections=[SectionSpec(number=i, title=f"Sec {i}") for i in range(1, 14)],
@@ -464,9 +464,9 @@ class TestThinCorpusBanner:
         assert "5 section" in rep.text
 
     def test_thin_corpus_banner_absent_on_healthy_run(self):
-        from hermes.pipeline.coverage import CoverageVerdict
-        from hermes.pipeline.report import assemble_report
-        from hermes.pipeline.spec import BriefSpec, SectionSpec
+        from newsagent.pipeline.coverage import CoverageVerdict
+        from newsagent.pipeline.report import assemble_report
+        from newsagent.pipeline.spec import BriefSpec, SectionSpec
         spec = BriefSpec(
             title="T",
             sections=[SectionSpec(number=i, title=f"Sec {i}") for i in range(1, 4)],
@@ -489,7 +489,7 @@ class TestThinCorpusBanner:
         assert "Thin-corpus run" not in rep.text
 
     def test_thin_corpus_banner_helper_thresholds(self):
-        from hermes.pipeline.report import thin_corpus_banner
+        from newsagent.pipeline.report import thin_corpus_banner
         # 5 sections × 5 threshold = 25 sources needed for "healthy" → 20 is thin.
         banner = thin_corpus_banner(total_sources=20, section_count=5, critical_sections=0)
         assert "Thin-corpus run" in banner
@@ -542,8 +542,8 @@ def test_drop_empty_subheadings_keeps_subheading_with_body():
 
 
 def test_validity_gate_rejects_cot_and_missing_heading():
-    from hermes.pipeline.synthesize import has_valid_section
-    from hermes.pipeline.spec import SectionSpec
+    from newsagent.pipeline.synthesize import has_valid_section
+    from newsagent.pipeline.spec import SectionSpec
     sec8 = SectionSpec(number=8, title="Funding, M&A & Business")
     # CoT dump with no real heading → invalid.
     assert has_valid_section("write a section for an AI report. we are told to...", sec8) is False
@@ -570,8 +570,8 @@ def test_validity_gate_rejects_cot_and_missing_heading():
 
 def test_clean_section_text_trims_cot_tail_keeps_real_prose():
     # Section-10 pattern: real headed prose followed by a planning tail.
-    from hermes.pipeline.synthesize import clean_section_text
-    from hermes.pipeline.spec import SectionSpec
+    from newsagent.pipeline.synthesize import clean_section_text
+    from newsagent.pipeline.spec import SectionSpec
     sec10 = SectionSpec(number=10, title="Enterprise & Industry Adoption")
     body = "## **10. Enterprise & Industry Adoption**\n\n" + ("Real analysis sentence about adoption. " * 12) + "[src:https://x/1]\n\n"
     tail = "Now, format: The section must begin exactly. we'll use the source. say: foo."
@@ -584,8 +584,8 @@ def test_clean_section_text_trims_cot_tail_keeps_real_prose():
 
 
 def test_clean_section_text_rejects_full_cot_dump():
-    from hermes.pipeline.synthesize import clean_section_text
-    from hermes.pipeline.spec import SectionSpec
+    from newsagent.pipeline.synthesize import clean_section_text
+    from newsagent.pipeline.spec import SectionSpec
     sec8 = SectionSpec(number=8, title="Funding, M&A & Business")
     # Marker appears before any real prose → full dump → None.
     dump = "## **8. Funding**\n\nNow, write the actual section. we are supposed to synthesize."
@@ -616,8 +616,8 @@ def test_clean_section_text_keeps_real_content_after_preamble():
     # pipeline runs drop_empty_subheadings then clean_section_text; together they
     # drop the stubs+placeholder bodies and the "Now, fill in." line, keeping the
     # real content.
-    from hermes.pipeline.synthesize import clean_section_text
-    from hermes.pipeline.spec import SectionSpec
+    from newsagent.pipeline.synthesize import clean_section_text
+    from newsagent.pipeline.spec import SectionSpec
     sec12 = SectionSpec(number=12, title="Benchmarks & Capability")
     text = (
         "## **12. Benchmarks & Capability**\n\n"
@@ -643,8 +643,8 @@ def test_clean_section_text_keeps_real_content_after_preamble():
 def test_clean_section_text_rejects_full_planning_section():
     # Section-5 shape: heading + only planning lines ("we'll", "we can organize",
     # "list key events") — no real analysis. After line-removal, no prose → None.
-    from hermes.pipeline.synthesize import clean_section_text
-    from hermes.pipeline.spec import SectionSpec
+    from newsagent.pipeline.synthesize import clean_section_text
+    from newsagent.pipeline.spec import SectionSpec
     sec5 = SectionSpec(number=5, title="AI Agents & Coding")
     text = (
         "## 5. AI Agents & Coding\n\n"
@@ -665,8 +665,8 @@ def test_clean_section_text_kills_meta_authorship_tail():
     # " write." fragment + a "First, craft an executive summary..." planning line.
     # Line-level marker removal drops the meta lines + bare-imperative fragment;
     # the real tables survive.
-    from hermes.pipeline.synthesize import clean_section_text
-    from hermes.pipeline.spec import SectionSpec
+    from newsagent.pipeline.synthesize import clean_section_text
+    from newsagent.pipeline.spec import SectionSpec
     sec12 = SectionSpec(number=12, title="Benchmarks & Capability")
     text = (
         "## **12. Benchmarks & Capability**\n\n"
@@ -714,8 +714,8 @@ def test_clean_section_text_keeps_legit_fabricated_information_term():
     # Guard against false positive: "fabricated information" is a legit definitional
     # term (e.g. a hallucination table), NOT the meta "fabricate numbers" CoT.
     # The precise marker "fabricate numbers" must not match "fabricated information".
-    from hermes.pipeline.synthesize import clean_section_text
-    from hermes.pipeline.spec import SectionSpec
+    from newsagent.pipeline.synthesize import clean_section_text
+    from newsagent.pipeline.spec import SectionSpec
     sec6 = SectionSpec(number=6, title="Open Source AI")
     text = (
         "## **6. Open Source AI**\n\n"
@@ -738,8 +738,8 @@ def test_clean_section_text_keeps_legit_end_user_prose():
     # Guard: bare end-user references in enterprise analysis ("the user expects a
     # model to...") must NOT be line-dropped — only the meta "the user expects us"
     # form is banned. Prevents over-broad meta-authorship matching.
-    from hermes.pipeline.synthesize import clean_section_text
-    from hermes.pipeline.spec import SectionSpec
+    from newsagent.pipeline.synthesize import clean_section_text
+    from newsagent.pipeline.spec import SectionSpec
     sec10 = SectionSpec(number=10, title="Enterprise & Industry Adoption")
     text = (
         "## **10. Enterprise & Industry Adoption**\n\n"
@@ -759,8 +759,8 @@ def test_clean_section_text_keeps_legit_end_user_prose():
 def test_is_substantial_section_rejects_thin_but_valid_section():
     # A headed section with only ~20 words of real prose should be considered a stub
     # and rejected by the substantial gate, even if it passes the CoT validity gate.
-    from hermes.pipeline.synthesize import is_substantial_section
-    from hermes.pipeline.spec import SectionSpec
+    from newsagent.pipeline.synthesize import is_substantial_section
+    from newsagent.pipeline.spec import SectionSpec
     sec = SectionSpec(number=3, title="Frontier Models")
     thin = "## **3. Frontier Models**\n\nSome models released. [src:https://x/1]"
     assert is_substantial_section(thin, sec) is False
@@ -785,8 +785,8 @@ def test_build_section_prompt_forbids_cot_and_stubs():
     # The writer prompt must explicitly instruct the model to avoid the failure modes
     # observed in the 2026-07-13 monthly report: planning language, placeholder
     # subheadings, ellipses, bracketed fig-leaf labels, and thin stubs.
-    from hermes.pipeline.synthesize import build_section_prompt
-    from hermes.pipeline.spec import SectionSpec
+    from newsagent.pipeline.synthesize import build_section_prompt
+    from newsagent.pipeline.spec import SectionSpec
     sec = SectionSpec(number=6, title="Open Source AI", bullets=["licenses", "adoption"])
     prompt = build_section_prompt(sec, [], "instructions", ["quality"], "July 2026")
     lowered = prompt.lower()
@@ -813,7 +813,7 @@ class TestCoverageSummary:
     """
 
     def test_coverage_summary_renders_per_section_verdict(self):
-        from hermes.pipeline.report import format_coverage_summary
+        from newsagent.pipeline.report import format_coverage_summary
 
         verdicts = [
             ("Executive Summary", "OK"),
@@ -830,7 +830,7 @@ class TestCoverageSummary:
         assert "| Benchmarks & Capability | OK |" in out
 
     def test_coverage_summary_empty_returns_empty(self):
-        from hermes.pipeline.report import format_coverage_summary
+        from newsagent.pipeline.report import format_coverage_summary
 
         assert format_coverage_summary([]) == ""
 
@@ -839,9 +839,9 @@ class TestCoverageSummary:
         # to the report text when verdicts are supplied. The footer appears
         # AFTER the body and AFTER the references block (so it serves as a
         # visible "what you just read was supported by" callout).
-        from hermes.pipeline.coverage import CoverageVerdict
-        from hermes.pipeline.report import assemble_report
-        from hermes.pipeline.spec import BriefSpec, SectionSpec
+        from newsagent.pipeline.coverage import CoverageVerdict
+        from newsagent.pipeline.report import assemble_report
+        from newsagent.pipeline.spec import BriefSpec, SectionSpec
 
         spec = BriefSpec(
             title="T",

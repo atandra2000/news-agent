@@ -10,7 +10,7 @@ the cross-post groups so the writer prompt can cite once and note
 
 from __future__ import annotations
 
-from hermes.pipeline.search import (
+from newsagent.pipeline.search import (
     SearchResult,
     content_fingerprint,
     dedup_sources_with_cross_posts,

@@ -1,6 +1,6 @@
-# /etc/systemd/system/hermes.timer
+# /etc/systemd/system/newsagent.timer
 [Unit]
-Description=Run Hermes daily at 06:00 local time
+Description=Run newsagent daily at 06:00 local time
 
 [Timer]
 OnCalendar=*-*-* 06:00:00

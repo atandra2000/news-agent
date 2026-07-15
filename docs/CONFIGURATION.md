@@ -1,11 +1,11 @@
 # Configuration
 
 > Every environment variable, settings group, profile, and `.env` reference
-> for Hermes.
+> for newsagent.
 
-All settings use the `HERMES_` env prefix and are loaded from a `.env` file in
+All settings use the `NEWSAGENT_` env prefix and are loaded from a `.env` file in
 the project root (gitignored). Settings are validated by Pydantic
-(`hermes/config.py`). Unknown env vars are ignored.
+(`newsagent/config.py`). Unknown env vars are ignored.
 
 ---
 
@@ -13,19 +13,19 @@ the project root (gitignored). Settings are validated by Pydantic
 
 ```bash
 # .env — copy from .env.example and fill in.
-HERMES_LLM_BACKEND=opencode_go
-HERMES_LLM_OPENCODE_GO_BASE_URL=https://opencode.ai/zen/go/v1
-HERMES_LLM_OPENCODE_GO_API_KEY=<your-key>
+NEWSAGENT_LLM_BACKEND=opencode_go
+NEWSAGENT_LLM_OPENCODE_GO_BASE_URL=https://opencode.ai/zen/go/v1
+NEWSAGENT_LLM_OPENCODE_GO_API_KEY=<your-key>
 # Leave blank for per-tier catalog routing:
-HERMES_LLM_OPENCODE_GO_MODEL=
+NEWSAGENT_LLM_OPENCODE_GO_MODEL=
 
-HERMES_SEARCH_BACKEND=none
-HERMES_SEARCH_TAVILY_API_KEY=
+NEWSAGENT_SEARCH_BACKEND=none
+NEWSAGENT_SEARCH_TAVILY_API_KEY=
 ```
 
 ---
 
-## 2. LLM settings (`HERMES_LLM_`)
+## 2. LLM settings (`NEWSAGENT_LLM_`)
 
 | Variable | Default | Description |
 |----------|---------|-------------|
@@ -53,7 +53,7 @@ HERMES_SEARCH_TAVILY_API_KEY=
 
 ### Per-tier catalog routing (opencode_go)
 
-When `HERMES_LLM_OPENCODE_GO_MODEL` is blank, each role routes to its tier's
+When `NEWSAGENT_LLM_OPENCODE_GO_MODEL` is blank, each role routes to its tier's
 chain in `OPENCODE_GO_CATALOG`:
 
 | Tier | Primary model | Used by roles |
@@ -70,7 +70,7 @@ token budgets. See [LLM_PROVIDERS.md](./LLM_PROVIDERS.md) for the full catalog.
 
 ---
 
-## 3. Collector settings (`HERMES_COLLECTOR_`)
+## 3. Collector settings (`NEWSAGENT_COLLECTOR_`)
 
 | Variable | Default | Description |
 |----------|---------|-------------|
@@ -83,7 +83,7 @@ token budgets. See [LLM_PROVIDERS.md](./LLM_PROVIDERS.md) for the full catalog.
 
 ---
 
-## 4. Embedder settings (`HERMES_EMBED_`)
+## 4. Embedder settings (`NEWSAGENT_EMBED_`)
 
 | Variable | Default | Description |
 |----------|---------|-------------|
@@ -94,7 +94,7 @@ token budgets. See [LLM_PROVIDERS.md](./LLM_PROVIDERS.md) for the full catalog.
 
 ---
 
-## 5. Pipeline settings (`HERMES_PIPELINE_`)
+## 5. Pipeline settings (`NEWSAGENT_PIPELINE_`)
 
 | Variable | Default | Description |
 |----------|---------|-------------|
@@ -105,20 +105,20 @@ token budgets. See [LLM_PROVIDERS.md](./LLM_PROVIDERS.md) for the full catalog.
 
 ---
 
-## 6. Storage settings (`HERMES_STORAGE_`)
+## 6. Storage settings (`NEWSAGENT_STORAGE_`)
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `DIR` | `storage` | Root storage directory |
-| `SQLITE_FILE` | `hermes.db` | SQLite filename inside storage dir |
+| `SQLITE_FILE` | `newsagent.db` | SQLite filename inside storage dir |
 | `VECTOR_BACKEND` | `numpy` | `numpy` (default, zero-dep) or `qdrant` (embedded local mode) |
 | `QDRANT_DIR` | `vectors` | Qdrant local on-disk path inside storage dir |
-| `QDRANT_COLLECTION` | `hermes` | Qdrant collection name |
+| `QDRANT_COLLECTION` | `newsagent` | Qdrant collection name |
 | `OBSIDIAN_VAULT` | _(none)_ | Obsidian vault directory to mirror reports into |
 
 ---
 
-## 7. Search settings (`HERMES_SEARCH_`)
+## 7. Search settings (`NEWSAGENT_SEARCH_`)
 
 | Variable | Default | Description |
 |----------|---------|-------------|
@@ -132,7 +132,7 @@ token budgets. See [LLM_PROVIDERS.md](./LLM_PROVIDERS.md) for the full catalog.
 
 ---
 
-## 8. RAG settings (`HERMES_RAG_`)
+## 8. RAG settings (`NEWSAGENT_RAG_`)
 
 | Variable | Default | Description |
 |----------|---------|-------------|
@@ -151,8 +151,8 @@ token budgets. See [LLM_PROVIDERS.md](./LLM_PROVIDERS.md) for the full catalog.
 
 ## 9. Report profiles
 
-Profiles are defined in [`hermes/profiles.py`](../src/hermes/profiles.py).
-Cadence is set via `HERMES_CADENCE` in `.env` (not via profile); the profile
+Profiles are defined in [`newsagent/profiles.py`](../src/newsagent/profiles.py).
+Cadence is set via `NEWSAGENT_CADENCE` in `.env` (not via profile); the profile
 selects the structural parameters of the report.
 
 | Profile | top_k_analysis | report_top_k | depth | sections (legacy 18-renderer subset) |
@@ -163,24 +163,24 @@ selects the structural parameters of the report.
 | `deep_dive` | 10 | 10 | exhaustive | 7 focused |
 | `trend_report` | 40 | 40 | standard | 6 trend-focused |
 
-> The `sections` column selects a subset of the legacy 18 `hermes.renderers`
+> The `sections` column selects a subset of the legacy 18 `newsagent.renderers`
 > (used only by the fallback path). The unified pipeline builds a
 > **dynamic** report (synthesized per prompt + References & Provenance)
 > via `stages/renderer.py`, so this column does not constrain the output.
 
 Profiles override `settings.pipeline.*`. No new pipeline code is needed for a
 new profile — just add an entry to `PROFILES` in
-[`hermes/profiles.py`](../src/hermes/profiles.py).
+[`newsagent/profiles.py`](../src/newsagent/profiles.py).
 
 ---
 
-## 10. Global settings (`HERMES_`)
+## 10. Global settings (`NEWSAGENT_`)
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `LOG_LEVEL` | `INFO` | Logging level |
 | `JSON_LOGS` | `False` | If `True`, emit JSON-formatted logs |
-| `CADENCE` | `daily` | Lookback window + per-section source budget. One of: `daily` (last 24h), `weekly` (last 7 days), `monthly` (last 30 days). Invalid values fall back to `daily` at the orchestrator boundary. Loaded by `pipeline/cadence.py` into a `CadenceSpec(window, days, per_section, sources, max_tokens, min_citations)`. **Overridden by the brief's own cadence hint** when `parse_prompt` detects `"monthly"` / `"weekly"` / `"daily"` in the title or first 800 chars of the body — `spec.cadence` takes precedence over `HERMES_CADENCE` so the lookback window always matches the prompt body. |
+| `CADENCE` | `daily` | Lookback window + per-section source budget. One of: `daily` (last 24h), `weekly` (last 7 days), `monthly` (last 30 days). Invalid values fall back to `daily` at the orchestrator boundary. Loaded by `pipeline/cadence.py` into a `CadenceSpec(window, days, per_section, sources, max_tokens, min_citations)`. **Overridden by the brief's own cadence hint** when `parse_prompt` detects `"monthly"` / `"weekly"` / `"daily"` in the title or first 800 chars of the body — `spec.cadence` takes precedence over `NEWSAGENT_CADENCE` so the lookback window always matches the prompt body. |
 
 ---
 
@@ -188,24 +188,24 @@ new profile — just add an entry to `PROFILES` in
 
 ```bash
 # LLM backend
-HERMES_LLM_OLLAMA_BASE_URL=https://api.ollama.com
-HERMES_LLM_OLLAMA_API_KEY=
-HERMES_LLM_BACKEND=opencode_go
-HERMES_LLM_OPENCODE_GO_BASE_URL=https://opencode.ai/zen/go/v1
-HERMES_LLM_OPENCODE_GO_API_KEY=<your-key>
-HERMES_LLM_OPENCODE_GO_MODEL=
+NEWSAGENT_LLM_OLLAMA_BASE_URL=https://api.ollama.com
+NEWSAGENT_LLM_OLLAMA_API_KEY=
+NEWSAGENT_LLM_BACKEND=opencode_go
+NEWSAGENT_LLM_OPENCODE_GO_BASE_URL=https://opencode.ai/zen/go/v1
+NEWSAGENT_LLM_OPENCODE_GO_API_KEY=<your-key>
+NEWSAGENT_LLM_OPENCODE_GO_MODEL=
 
 # Cadence (drives the lookback window + per-section source budget)
-HERMES_CADENCE=daily
+NEWSAGENT_CADENCE=daily
 
 # Search (optional, for web-grounded synthesis)
-HERMES_SEARCH_BACKEND=none
-HERMES_SEARCH_TAVILY_API_KEY=
+NEWSAGENT_SEARCH_BACKEND=none
+NEWSAGENT_SEARCH_TAVILY_API_KEY=
 
 # Storage (optional)
-HERMES_STORAGE_OBSIDIAN_VAULT=~/Documents/obsidian
+NEWSAGENT_STORAGE_OBSIDIAN_VAULT=~/Documents/obsidian
 
 # Logging
-HERMES_LOG_LEVEL=INFO
-HERMES_JSON_LOGS=False
+NEWSAGENT_LOG_LEVEL=INFO
+NEWSAGENT_JSON_LOGS=False
 ```

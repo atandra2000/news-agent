@@ -1,13 +1,13 @@
 # CLI
 
-> All `hermes` CLI commands, flags, and scheduler setup.
+> All `newsagent` CLI commands, flags, and scheduler setup.
 
 ---
 
 ## 1. Commands
 
 The CLI exposes **7 commands**. The unified pipeline is invoked by
-`hermes news <prompt.md>`; the rest are inspection / post-hoc utilities.
+`newsagent news <prompt.md>`; the rest are inspection / post-hoc utilities.
 
 | Command | Positional | Flags |
 |---------|------------|-------|
@@ -20,10 +20,10 @@ The CLI exposes **7 commands**. The unified pipeline is invoked by
 | `sources` | — | — |
 
 > `news` no longer accepts `--daily` / `--weekly` / `--monthly`; cadence is
-> configured via `HERMES_CADENCE` in `.env`. The legacy `--rate` flag for
-> feedback was moved to `hermes eval --rate 1-5`.
+> configured via `NEWSAGENT_CADENCE` in `.env`. The legacy `--rate` flag for
+> feedback was moved to `newsagent eval --rate 1-5`.
 
-### `hermes news`
+### `newsagent news`
 
 Run the unified research pipeline. Required argument is a Markdown prompt
 file; the orchestrator parses it into a `BriefSpec`, collects items, builds
@@ -31,82 +31,82 @@ the evidence graph, and (if the spec has 3+ sections) runs the cognition
 core before per-section synthesis.
 
 ```bash
-hermes news <prompt.md>
+newsagent news <prompt.md>
 ```
 
-### `hermes eval`
+### `newsagent eval`
 
 Evaluate a brief-generated report against its prompt. With `--rate N`,
 record user feedback (1-5) for the prompt instead of running evaluation.
 Scores are stored in the `ReportEval` table and feed the adaptive adapter.
 
 ```bash
-hermes eval <report.md> --prompt <prompt.md> [--cadence daily|weekly|monthly] [--rate 1-5]
+newsagent eval <report.md> --prompt <prompt.md> [--cadence daily|weekly|monthly] [--rate 1-5]
 ```
 
-### `hermes quality`
+### `newsagent quality`
 
 Self-assess a previously-generated report on 6 quality dimensions. Persists
 improvement notes to self-improving memory.
 
 ```bash
-hermes quality [--date YYYY-MM-DD]
+newsagent quality [--date YYYY-MM-DD]
 ```
 
-### `hermes profiles`
+### `newsagent profiles`
 
 List available report profiles with their configuration.
 
 ```bash
-hermes profiles
+newsagent profiles
 ```
 
-### `hermes status`
+### `newsagent status`
 
 Show database stats: total items, canonical items, reports, evals, adapter
 state.
 
 ```bash
-hermes status
+newsagent status
 ```
 
-### `hermes models`
+### `newsagent models`
 
 List all models on the live LLM endpoint and check them against the curated
 catalog. Shows ✓ (present) or · (not found) for each catalog model.
 
 ```bash
-hermes models
+newsagent models
 ```
 
-### `hermes sources`
+### `newsagent sources`
 
 List registered collectors and which are enabled in config.
 
 ```bash
-hermes sources
+newsagent sources
 ```
 
-### `hermes help`
+### `newsagent help`
 
 Print usage.
 
 ```bash
-hermes help
-hermes -h
-hermes --help
+newsagent help
+newsagent -h
+newsagent --help
 ```
 
 ---
 
 ## 2. Scheduler setup
 
-Hermes is a one-shot CLI — no daemon. The OS scheduler invokes
-`hermes news <prompt.md>` once a day.
+newsagent is a one-shot CLI — no daemon. The OS scheduler invokes
+`newsagent news <prompt.md>` once a day.
 
 ### macOS (launchd)
 
-Create `~/Library/LaunchAgents/com.hermes.daily.plist`:
+Create `~/Library/LaunchAgents/com.newsagent.daily.plist`:
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -114,15 +114,15 @@ Create `~/Library/LaunchAgents/com.hermes.daily.plist`:
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.hermes.daily</string>
+    <string>com.newsagent.daily</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/path/to/.venv/bin/hermes</string>
+        <string>/path/to/.venv/bin/newsagent</string>
         <string>news</string>
         <string>example_prompt.md</string>
     </array>
     <key>WorkingDirectory</key>
-    <string>/path/to/hermes</string>
+    <string>/path/to/news-agent</string>
     <key>StartCalendarInterval</key>
     <dict>
         <key>Hour</key>
@@ -131,38 +131,38 @@ Create `~/Library/LaunchAgents/com.hermes.daily.plist`:
         <integer>0</integer>
     </dict>
     <key>StandardOutPath</key>
-    <string>/path/to/hermes/storage/logs/hermes.out.log</string>
+    <string>/path/to/newsagent/storage/logs/newsagent.out.log</string>
     <key>StandardErrorPath</key>
-    <string>/path/to/hermes/storage/logs/hermes.err.log</string>
+    <string>/path/to/newsagent/storage/logs/newsagent.err.log</string>
 </dict>
 </plist>
 ```
 
 ```bash
-launchctl load ~/Library/LaunchAgents/com.hermes.daily.plist
+launchctl load ~/Library/LaunchAgents/com.newsagent.daily.plist
 ```
 
 ### Linux (systemd)
 
-Create `~/.config/systemd/user/hermes.service`:
+Create `~/.config/systemd/user/newsagent.service`:
 
 ```ini
 [Unit]
-Description=Hermes daily AI research report
+Description=newsagent daily AI research report
 After=network.target
 
 [Service]
 Type=oneshot
-WorkingDirectory=/path/to/hermes
-ExecStart=/path/to/.venv/bin/hermes news example_prompt.md
-Environment=HERMES_LOG_LEVEL=INFO
+WorkingDirectory=/path/to/news-agent
+ExecStart=/path/to/.venv/bin/newsagent news example_prompt.md
+Environment=NEWSAGENT_LOG_LEVEL=INFO
 ```
 
-Create `~/.config/systemd/user/hermes.timer`:
+Create `~/.config/systemd/user/newsagent.timer`:
 
 ```ini
 [Unit]
-Description=Run Hermes daily at 08:00
+Description=Run newsagent daily at 08:00
 
 [Timer]
 OnCalendar=*-*-* 08:00:00
@@ -173,15 +173,15 @@ WantedBy=timers.target
 ```
 
 ```bash
-systemctl --user enable hermes.timer
-systemctl --user start hermes.timer
+systemctl --user enable newsagent.timer
+systemctl --user start newsagent.timer
 ```
 
 ### Cron (simplest)
 
 ```bash
-# Run Hermes daily at 08:00.
-0 8 * * * cd /path/to/hermes && .venv/bin/hermes news example_prompt.md >> storage/logs/hermes.log 2>&1
+# Run newsagent daily at 08:00.
+0 8 * * * cd /path/to/news-agent && .venv/bin/newsagent news example_prompt.md >> storage/logs/newsagent.log 2>&1
 ```
 
 ---
@@ -189,23 +189,23 @@ systemctl --user start hermes.timer
 ## 3. Environment
 
 The CLI reads `.env` from the working directory. All settings use the
-`HERMES_` prefix. See [CONFIGURATION.md](./CONFIGURATION.md) for the full
+`NEWSAGENT_` prefix. See [CONFIGURATION.md](./CONFIGURATION.md) for the full
 reference.
 
 ```bash
 # Required for LLM-backed runs:
-HERMES_LLM_BACKEND=opencode_go
-HERMES_LLM_OPENCODE_GO_API_KEY=<key>
+NEWSAGENT_LLM_BACKEND=opencode_go
+NEWSAGENT_LLM_OPENCODE_GO_API_KEY=<key>
 
-# Cadence for `hermes news`:
-HERMES_CADENCE=daily
+# Cadence for `newsagent news`:
+NEWSAGENT_CADENCE=daily
 
 # Optional for web-grounded synthesis:
-HERMES_SEARCH_BACKEND=tavily
-HERMES_SEARCH_TAVILY_API_KEY=<key>
+NEWSAGENT_SEARCH_BACKEND=tavily
+NEWSAGENT_SEARCH_TAVILY_API_KEY=<key>
 
 # Optional for Obsidian mirror:
-HERMES_STORAGE_OBSIDIAN_VAULT=~/Documents/obsidian
+NEWSAGENT_STORAGE_OBSIDIAN_VAULT=~/Documents/obsidian
 ```
 
 ---
@@ -214,7 +214,7 @@ HERMES_STORAGE_OBSIDIAN_VAULT=~/Documents/obsidian
 
 | Path | Contents |
 |------|----------|
-| `storage/hermes.db` | SQLite database (all tables) |
+| `storage/newsagent.db` | SQLite database (all tables) |
 | `storage/reports/<prompt-slug>.md` | Unified pipeline reports |
 | `storage/run_manifests/<timestamp>.json` | Per-run manifests with stage stats |
 | `storage/quality/YYYY-MM-DD.md` | Quality self-assessment reports |

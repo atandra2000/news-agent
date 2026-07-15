@@ -18,15 +18,15 @@ import asyncio
 from datetime import datetime, timezone
 
 
-from hermes.collectors.context7 import Context7Collector
-from hermes.collectors.devto import DevToCollector
-from hermes.collectors.github_releases import GitHubReleaseCollector
-from hermes.collectors.github_topic_search import GithubTopicSearchCollector
-from hermes.collectors.lobsters import LobstersCollector
-from hermes.collectors.reddit import RedditCollector
-from hermes.collectors.registry import REGISTRY, get_collector, run_collector
-from hermes.collectors.tavily_search import TavilySearchCollector
-from hermes.collectors.x_twitter import XTwitterCollector
+from newsagent.collectors.context7 import Context7Collector
+from newsagent.collectors.devto import DevToCollector
+from newsagent.collectors.github_releases import GitHubReleaseCollector
+from newsagent.collectors.github_topic_search import GithubTopicSearchCollector
+from newsagent.collectors.lobsters import LobstersCollector
+from newsagent.collectors.reddit import RedditCollector
+from newsagent.collectors.registry import REGISTRY, get_collector, run_collector
+from newsagent.collectors.tavily_search import TavilySearchCollector
+from newsagent.collectors.x_twitter import XTwitterCollector
 
 
 def test_registry_includes_new_collectors():

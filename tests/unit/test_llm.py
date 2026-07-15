@@ -15,7 +15,7 @@ import httpx
 import pytest
 import respx
 
-from hermes.llm.catalog import (
+from newsagent.llm.catalog import (
     MODEL_CATALOG,
     OLLAMA_CATALOG,
     OPENCODE_GO_CATALOG,
@@ -24,14 +24,14 @@ from hermes.llm.catalog import (
     all_catalog_models,
     tier_spec,
 )
-from hermes.llm.providers.base import BaseProvider, ProviderResult
-from hermes.llm.providers.ollama import OllamaProvider
-from hermes.llm.providers.openai_compatible import OpenAICompatibleProvider
-from hermes.llm.providers.opencode_go import OpenCodeGoProvider
-from hermes.llm.providers.registry import ModelRegistry, build_registry
-from hermes.llm.roles import ROLES, get_role, get_role_for_provider
-from hermes.llm.router import LLMRouter
-from hermes.errors import LLMError
+from newsagent.llm.providers.base import BaseProvider, ProviderResult
+from newsagent.llm.providers.ollama import OllamaProvider
+from newsagent.llm.providers.openai_compatible import OpenAICompatibleProvider
+from newsagent.llm.providers.opencode_go import OpenCodeGoProvider
+from newsagent.llm.providers.registry import ModelRegistry, build_registry
+from newsagent.llm.roles import ROLES, get_role, get_role_for_provider
+from newsagent.llm.router import LLMRouter
+from newsagent.errors import LLMError
 
 
 # ── Catalog ──────────────────────────────────────────────────────────────────

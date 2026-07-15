@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from hermes.llm.embed import Embedder
+from newsagent.llm.embed import Embedder
 
 
 def test_hashing_embedder_shape():

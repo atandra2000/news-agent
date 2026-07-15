@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import pytest
 
-from hermes.output import MarkdownFileSink, ObsidianSink, build_sinks
+from newsagent.output import MarkdownFileSink, ObsidianSink, build_sinks
 
 
 class TestMarkdownFileSink:
@@ -42,12 +42,12 @@ class TestObsidianSink:
         vault = tmp_path / "vault"
         sink = ObsidianSink(vault)
         await sink.deliver("# Report\n\nbody text", {"date": "2026-07-11"})
-        out = vault / "Hermes_2026-07-11.md"
+        out = vault / "newsagent_2026-07-11.md"
         assert out.exists()
         text = out.read_text()
         assert text.startswith("---")
         assert "tags:" in text
-        assert "hermes" in text
+        assert "newsagent" in text
         assert "# Report" in text
 
     @pytest.mark.asyncio
@@ -64,7 +64,7 @@ class TestObsidianSink:
         # Should not raise.
         await sink.deliver("content", {"date": "test"})
         # No file written.
-        assert not (tmp_path / "Hermes_test.md").exists()
+        assert not (tmp_path / "newsagent_test.md").exists()
 
     def test_name_is_obsidian(self):
         assert ObsidianSink(None).name == "obsidian"

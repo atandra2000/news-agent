@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import timezone
 
-from hermes.cli import _parse_args, _parse_date, main
+from newsagent.cli import _parse_args, _parse_date, main
 
 
 class TestParseArgs:
@@ -56,7 +56,7 @@ class TestParseArgs:
         assert args["positionals"] == ["prompt.md"]
 
     def test_news_prompt_positional_dispatch(self):
-        # `hermes news <prompt.md>` must be recognized as a single command +
+        # `newsagent news <prompt.md>` must be recognized as a single command +
         # positional, ready for the production pipeline dispatch.
         args = _parse_args(["news", "example_prompt.md"])
         assert args["command"] == "news"
@@ -94,9 +94,9 @@ class TestParseDate:
 
 class TestCLIUsesPipeline:
     def test_cli_dispatches_to_run_news_pipeline(self, tmp_path, monkeypatch):
-        # Local import inside _cmd_news reads from hermes.pipeline.orchestrator,
+        # Local import inside _cmd_news reads from newsagent.pipeline.orchestrator,
         # so patch the symbol at its source module.
-        from hermes.pipeline import orchestrator
+        from newsagent.pipeline import orchestrator
         from pathlib import Path
 
         called = {"kwargs": None}
@@ -106,14 +106,14 @@ class TestCLIUsesPipeline:
             return tmp_path / "fake_report.md"
 
         monkeypatch.setattr(orchestrator, "run_news_pipeline", _fake)
-        from hermes.cli import main as cli_main
+        from newsagent.cli import main as cli_main
         rc = cli_main(["news", "example_prompt.md"])
         assert rc == 0
         assert Path(called["kwargs"]["brief_path"]).name == "example_prompt.md"
         assert called["kwargs"].get("settings") is not None
 
     def test_run_news_pipeline_signature(self):
-        from hermes.pipeline.orchestrator import run_news_pipeline
+        from newsagent.pipeline.orchestrator import run_news_pipeline
         import inspect
         sig = inspect.signature(run_news_pipeline)
         assert "settings" in sig.parameters
@@ -125,8 +125,8 @@ class TestCLICommands:
         rc = main(["help"])
         assert rc == 0
         out = capsys.readouterr().out
-        assert "hermes news" in out
-        assert "hermes models" in out
+        assert "newsagent news" in out
+        assert "newsagent models" in out
 
     def test_no_args_prints_help(self, capsys):
         rc = main([])
@@ -136,7 +136,7 @@ class TestCLICommands:
 
     def test_status_runs_without_crash(self, capsys, tmp_path, monkeypatch):
 
-        monkeypatch.setenv("HERMES_STORAGE_DIR", str(tmp_path))
+        monkeypatch.setenv("NEWSAGENT_STORAGE_DIR", str(tmp_path))
         rc = main(["status"])
         assert rc == 0
         out = capsys.readouterr().out

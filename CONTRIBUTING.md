@@ -1,6 +1,6 @@
-# Contributing to Hermes
+# Contributing to newsagent
 
-Hermes is an autonomous AI research-intelligence agent: it collects from
+newsagent is an autonomous AI research-intelligence agent: it collects from
 multiple sources, plans per-section research, runs an LLM-driven
 synthesize→critic→rewrite loop, and renders a citation-backed report from a
 prompt. This guide covers how to set up the environment, run the checks, and
@@ -10,12 +10,12 @@ extend the system.
 
 ## 1. Development environment
 
-Hermes uses a `src/` layout and is installed as an editable package. A local
+newsagent uses a `src/` layout and is installed as an editable package. A local
 virtualenv (`.venv`) is required — the base system `python`/`python3` on this
 machine does **not** have `structlog` and will fail at import time.
 
 ```bash
-cd hermes
+cd newsagent
 python -m venv .venv
 .venv/bin/pip install -e ".[dev,embed,api]"
 ```
@@ -23,12 +23,12 @@ python -m venv .venv
 - `dev` — pytest, pytest-asyncio, respx, ruff, mypy
 - `embed` — `sentence-transformers` (semantic embeddings; falls back to hashing
   if absent)
-- `api` — FastAPI/uvicorn (only needed for the optional `hermes serve` API)
+- `api` — FastAPI/uvicorn (only needed for the optional `newsagent serve` API)
 
 Verify the install:
 
 ```bash
-.venv/bin/python -c "import hermes; print('ok')"
+.venv/bin/python -c "import newsagent; print('ok')"
 ```
 
 ---
@@ -62,9 +62,9 @@ Tests are offline by default — collectors and LLM calls are mocked with
 ## 3. Project layout
 
 ```
-src/hermes/
-  cli.py                 # entrypoint (hermes news / sources / quality)
-  config.py              # pydantic-settings; env vars HERMES_*
+src/newsagent/
+  cli.py                 # entrypoint (newsagent news / sources / quality)
+  config.py              # pydantic-settings; env vars NEWSAGENT_*
   profiles.py            # 5 report profiles
   collectors/            # source adapters + registry
   storage/               # db.py, models.py, vectorstore.py
@@ -87,8 +87,8 @@ docs/                    # architecture / config / pipeline / collectors / stora
 
 Notes on the recent unification: the prior `brief/`, `analyzers/`, and
 `renderers/` packages were collapsed into the single `pipeline/` package; the
-dual `hermes run` + `hermes news` commands were unified onto
-`hermes news <prompt.md>`. See `docs/ARCHITECTURE.md` for the current map and
+dual `newsagent run` + `newsagent news` commands were unified onto
+`newsagent news <prompt.md>`. See `docs/ARCHITECTURE.md` for the current map and
 the rationale.
 
 ---
@@ -113,8 +113,8 @@ the rationale.
 
 ## 5. Adding a collector
 
-1. Create `src/hermes/collectors/<name>.py` subclassing `CollectorAdapter`.
-2. Register it in `src/hermes/collectors/registry.py` (`REGISTRY` dict).
+1. Create `src/newsagent/collectors/<name>.py` subclassing `CollectorAdapter`.
+2. Register it in `src/newsagent/collectors/registry.py` (`REGISTRY` dict).
 3. Add it to the `CollectorConfig.enabled` default in `config.py` **only if** it
    has a stable, authenticated endpoint. (`reddit` and `papers_with_code` are
    intentionally excluded — their public web APIs are unreliable.)
@@ -127,7 +127,7 @@ See `docs/COLLECTORS.md` §5 for a worked example.
 
 ## 6. Adding a profile
 
-Add an entry to `PROFILES` in `src/hermes/profiles.py`. Profiles override
+Add an entry to `PROFILES` in `src/newsagent/profiles.py`. Profiles override
 `settings.pipeline.*` and select a subset of the legacy 18-renderer `sections`.
 No pipeline code changes are needed. Document new profiles in
 `docs/CONFIGURATION.md` §9.

@@ -60,14 +60,14 @@ class RawItem:
 | `lobsters` | Lobsters curated tech | `lobsters.py` | `score`, `comments_url` |
 
 > **Excluded by design:** the `reddit` and `papers_with_code` modules exist in
-> `hermes/collectors/` but are **not registered** (their public web APIs are
+> `newsagent/collectors/` but are **not registered** (their public web APIs are
 > unreliable). The coverage they would have provided is filled by `tavily`,
 > `context7`, `github_releases`, `devto`, and `lobsters`. Do not enable them
 > unless you have a stable, authenticated endpoint.
 
 ---
 
-## 3. Runner (`hermes/collectors/registry.py`)
+## 3. Runner (`newsagent/collectors/registry.py`)
 
 ```python
 async def run_collector(
@@ -90,10 +90,10 @@ In `.env`:
 
 ```bash
 # Comma-separated list of collector names (reddit/papers_with_code are excluded by design).
-HERMES_COLLECTOR_ENABLED=arxiv,rss,github_trending,huggingface,hacker_news,semantic_scholar
+NEWSAGENT_COLLECTOR_ENABLED=arxiv,rss,github_trending,huggingface,hacker_news,semantic_scholar
 ```
 
-Or override per profile in `hermes/profiles.py`:
+Or override per profile in `newsagent/profiles.py`:
 
 ```python
 "custom": ReportProfile(
@@ -106,18 +106,18 @@ Or override per profile in `hermes/profiles.py`:
 Check enabled vs. registered:
 
 ```bash
-hermes sources
+newsagent sources
 ```
 
 ---
 
 ## 5. Adding a new collector
 
-1. **Create the module** `hermes/collectors/<name>.py`:
+1. **Create the module** `newsagent/collectors/<name>.py`:
 
    ```python
    from datetime import datetime
-   from hermes.collectors.base import CollectorAdapter, RawItem
+   from newsagent.collectors.base import CollectorAdapter, RawItem
 
    class MyCollector(CollectorAdapter):
        source_type = "my_source"
@@ -138,10 +138,10 @@ hermes sources
            ]
    ```
 
-2. **Register it** in `hermes/collectors/registry.py`:
+2. **Register it** in `newsagent/collectors/registry.py`:
 
    ```python
-   from hermes.collectors.my_source import MyCollector
+   from newsagent.collectors.my_source import MyCollector
 
    REGISTRY: dict[str, type[CollectorAdapter]] = {
        ...
@@ -152,13 +152,13 @@ hermes sources
 3. **Enable it** in `.env`:
 
    ```bash
-   HERMES_COLLECTOR_ENABLED=...,my_source
+   NEWSAGENT_COLLECTOR_ENABLED=...,my_source
    ```
 
 4. **Test it:**
 
    ```bash
-   hermes sources  # should list my_source
+   newsagent sources  # should list my_source
    ```
 
 5. **Write a test** (offline, using `respx` to mock the API):
@@ -180,7 +180,7 @@ hermes sources
 
 ## 6. HTTP utilities
 
-`hermes/collectors/http.py` provides shared helpers:
+`newsagent/collectors/http.py` provides shared helpers:
 - Retry with exponential backoff (via `tenacity`).
 - Common timeout defaults.
 - Rate-limit header parsing.

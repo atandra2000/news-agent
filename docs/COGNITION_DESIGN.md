@@ -1,12 +1,12 @@
-# Hermes — Cognitive Architecture Design (Cognition Layer)
+# newsagent — Cognitive Architecture Design (Cognition Layer)
 
-> **Scope.** This document specifies the *cognition* of Hermes' autonomous agents:
+> **Scope.** This document specifies the *cognition* of newsagent' autonomous agents:
 > how they **reason, plan, research, verify, remember, and collaborate**. It is the
-> layer *inside* the agent boxes drawn in `HERMES_DESIGN.md §12.12`. It does **not**
+> layer *inside* the agent boxes drawn in `NEWSAGENT_DESIGN.md §12.12`. It does **not**
 > cover storage schemas, collector HTTP details, scheduler wiring, or renderer
 > Markdown formatting — those live in the system design and the implementation.
 >
-> **Authority.** `HERMES_DESIGN.md §11` (quality-first rubric) and `§12` (agent
+> **Authority.** `NEWSAGENT_DESIGN.md §11` (quality-first rubric) and `§12` (agent
 > split + capability enhancements) are authoritative. Every cognitive mechanism
 > below must map to at least one dimension of the §11.1 rubric:
 > **Coverage · Accuracy/Verification · Depth · Synthesis · Usefulness · Trust**.
@@ -15,7 +15,7 @@
 > **Hard constraints carried from the system design:**
 > - No agent-runtime framework (no Autogen/CrewAI/LangGraph). An "agent" is a
 >   focused `async` module with one job, its own prompt, and an LLM role.
-> - Memory is the set of persistent stores Hermes already writes (SQLite corpus +
+> - Memory is the set of persistent stores newsagent already writes (SQLite corpus +
 >   analyses, Qdrant vectors, trend snapshots, KG). No separate memory service.
 > - Research loops and RAG are gated and **partial-tolerant**: a failed sub-step
 >   never blocks the report; it is flagged, not fatal.
@@ -61,7 +61,7 @@ verification status when it reaches the Writer; the Writer cannot silently upgra
 
 ## 2. Memory Model — the "remember" substrate
 
-Hermes' long-term memory is the union of four persistent stores. There is **no
+newsagent' long-term memory is the union of four persistent stores. There is **no
 separate memory subsystem** (§12.8); "memory" is just disciplined access to stores
 the pipeline already writes.
 
@@ -879,13 +879,13 @@ A single `QualityScore` is computed per report, each dimension 0–10:
 
 `QualityScore = mean(dims)`. This is the number the Phase 8 loop optimizes.
 
-### 7.3 The Phase 8 quality loop (Hermes vs Perplexity)
+### 7.3 The Phase 8 quality loop (newsagent vs Perplexity)
 
 The report only improves if measured (§11.5). Protocol:
-1. On a calibration day, run **both** Hermes and "Perplexity: today's AI news" on
+1. On a calibration day, run **both** newsagent and "Perplexity: today's AI news" on
    the same input date.
 2. Blind-eval the two outputs on the 6 dimensions (LLM judge or human).
-3. Diff: where Hermes loses (e.g., weaker verification, thinner depth), file a
+3. Diff: where newsagent loses (e.g., weaker verification, thinner depth), file a
    *prompt/selection* change (not an architecture change).
 4. Re-run; track `QualityScore` trend over calibration days.
 5. Gate: a change ships only if it raises `QualityScore` without raising cost/run
@@ -897,7 +897,7 @@ prompt/selection tuning that moves the score.
 ### 7.4 Calibration tracking
 
 Store per-run `QualityScore` + per-dimension in the manifest; plot trend. A falling
-dimension after a change → revert. This is how Hermes "remembers" what works.
+dimension after a change → revert. This is how newsagent "remembers" what works.
 
 ---
 
@@ -951,4 +951,4 @@ The cognition layer is deliberately **not** a framework: it is ten focused modul
 sharing a `RunContext`, a `MemoryBus`, a `Handoff` protocol, and one bounded
 Critic→Rewrite (plus one bounded Verification→Research) loop — each mechanism mapped
 to a quality dimension, each bounded by budget, each partial-tolerant. That is what
-lets Hermes maximize report quality without becoming elegance-infra.
+lets newsagent maximize report quality without becoming elegance-infra.

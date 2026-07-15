@@ -14,12 +14,12 @@ regression on the final report.
 
 | # | Optimization | Stage | Impact | Mechanism |
 |---|---|---|---|---|
-| 1 | **Prompt caching (KV-cache reuse)** | all LLM calls | **HIGH** | `cache_prompt` (Ollama) / `cache_control` (OpenAI-compatible, best-effort) reuses the KV cache for identical prompt prefixes across the many repeated-prefix calls (same instruction headers, report scaffolding, lessons, graph context). Router-wide default `HERMES_LLM_PROMPT_CACHE=true`; requires `keep_alive` so the model + cache stay resident. |
+| 1 | **Prompt caching (KV-cache reuse)** | all LLM calls | **HIGH** | `cache_prompt` (Ollama) / `cache_control` (OpenAI-compatible, best-effort) reuses the KV cache for identical prompt prefixes across the many repeated-prefix calls (same instruction headers, report scaffolding, lessons, graph context). Router-wide default `NEWSAGENT_LLM_PROMPT_CACHE=true`; requires `keep_alive` so the model + cache stay resident. |
 | 2 | **Role tier rebalance** | analyze, synthesize | **HIGH** | `research` (per-item analysis, 25–60 calls/run) and `cluster_synth` (~10–20 calls/run) demoted from `writer` (deepseek-v4-pro) to `critic` (kimi-k2.6). Structured extraction/synthesis don't need the biggest model — ~3–5× cheaper per token. `chief_analyst`/`write` stay on `writer`. |
 | 3 | **Right-sized `num_ctx`** | analyze, synthesize | **MEDIUM** | `research`/`cluster_synth` use `num_ctx=8192` instead of the `writer` tier default 16384 — smaller KV cache, better throughput for small prompts. `get_role_for_provider` now preserves per-role `num_ctx`/`keep_alive` overrides. |
 | 4 | **Removed redundant double call** | synthesize | **MEDIUM** | `synthesize_stories._synthesize_batch` no longer re-issues a full `complete()` call on a JSON parse miss — `json_complete` already strips fences/extracts the first `{…}` span, so the second call was a pure duplicate burn. Goes straight to heuristic fallback. |
-| 5 | **Condensed self-critique input** | render (critic) | **MEDIUM** | The critic now receives headings + the opening 500 chars of each section (capped at `HERMES_PIPELINE_CRITIC_MAX_CHARS=3500`) instead of `body[:6000]`. ~75% smaller critic prompt in testing, same critique quality. Rewrite still gets the full body so no section is dropped. |
-| 6 | **Analyze content truncation** | analyze | **MEDIUM** | Per-item content truncated to `HERMES_PIPELINE_ANALYZE_MAX_CHARS=2500` (was hardcoded 4000). 100k–240k fewer prompt chars/run at no extraction-quality cost. |
+| 5 | **Condensed self-critique input** | render (critic) | **MEDIUM** | The critic now receives headings + the opening 500 chars of each section (capped at `NEWSAGENT_PIPELINE_CRITIC_MAX_CHARS=3500`) instead of `body[:6000]`. ~75% smaller critic prompt in testing, same critique quality. Rewrite still gets the full body so no section is dropped. |
+| 6 | **Analyze content truncation** | analyze | **MEDIUM** | Per-item content truncated to `NEWSAGENT_PIPELINE_ANALYZE_MAX_CHARS=2500` (was hardcoded 4000). 100k–240k fewer prompt chars/run at no extraction-quality cost. |
 | 7 | **Graph-context cap** | synthesize, chief | **MEDIUM** | Cross-document graph context capped at 4000 chars before injection into each synthesis batch + the Chief Analyst call (it is shared across all calls, so an unbounded graph would bloat every one). |
 | 8 | **Per-role token accounting** | all | **NEW** | `RouterStats.by_role` + `PipelineMetrics.llm_by_role` break down prompt/completion tokens per role, surfaced in the run manifest `metrics.llm.by_role`. Makes future cost tuning data-driven. |
 
@@ -184,9 +184,9 @@ Existing keys that affect performance:
 
 | Key | Default | Effect |
 |---|---|---|
-| `HERMES_COLLECTOR_CONCURRENCY` | 12 | Max parallel collectors |
-| `HERMES_PIPELINE_SECTION_CONCURRENCY` | 3 | Brief pipeline section parallelism |
-| `HERMES_LLM_TIMEOUT_SECONDS` | 180 | Per-call timeout |
+| `NEWSAGENT_COLLECTOR_CONCURRENCY` | 12 | Max parallel collectors |
+| `NEWSAGENT_PIPELINE_SECTION_CONCURRENCY` | 3 | Brief pipeline section parallelism |
+| `NEWSAGENT_LLM_TIMEOUT_SECONDS` | 180 | Per-call timeout |
 
 Internal concurrency limits (hardcoded, tunable):
 - `_ANALYZE_CONCURRENCY = 6` in `pipeline/analyze.py`

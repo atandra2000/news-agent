@@ -14,12 +14,12 @@ from __future__ import annotations
 import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
-from hermes.config import HermesSettings
-from hermes.llm.providers.base import ProviderResult
-from hermes.pipeline.cadence import resolve_cadence
-from hermes.pipeline.orchestrator import _synthesize_section_parallel
-from hermes.pipeline.search import SearchResult
-from hermes.pipeline.spec import BriefSpec, SectionSpec
+from newsagent.config import NewsAgentSettings
+from newsagent.llm.providers.base import ProviderResult
+from newsagent.pipeline.cadence import resolve_cadence
+from newsagent.pipeline.orchestrator import _synthesize_section_parallel
+from newsagent.pipeline.search import SearchResult
+from newsagent.pipeline.spec import BriefSpec, SectionSpec
 
 
 async def test_thin_section_attempts_synthesis(monkeypatch, tmp_path):
@@ -29,7 +29,7 @@ async def test_thin_section_attempts_synthesis(monkeypatch, tmp_path):
     silently dropped the section. Now: the section is always attempted; the
     writer prompt receives a "thin corpus" flag; a substantial synthesis wins.
     """
-    from hermes.pipeline import orchestrator as orch
+    from newsagent.pipeline import orchestrator as orch
 
     sec = SectionSpec(number=6, title="Funding, M&A & Business", bullets=["rounds"])
     spec = BriefSpec(title="T", sections=[sec])
@@ -58,7 +58,7 @@ async def test_thin_section_attempts_synthesis(monkeypatch, tmp_path):
         "cadence_ok": True, "has_cot_or_stub": False, "feedback": "",
     })
 
-    settings = HermesSettings()
+    settings = NewsAgentSettings()
     settings.storage.dir = tmp_path
     cad = resolve_cadence("monthly")
     semaphore = asyncio.Semaphore(1)
@@ -87,7 +87,7 @@ async def test_critical_section_attempts_synthesis(monkeypatch, tmp_path):
     uses ``CRITICAL`` to exercise the exact code path that was removed; it
     would fail on the old code.
     """
-    from hermes.pipeline import orchestrator as orch
+    from newsagent.pipeline import orchestrator as orch
 
     sec = SectionSpec(number=6, title="Funding, M&A & Business", bullets=["rounds"])
     spec = BriefSpec(title="T", sections=[sec])
@@ -115,7 +115,7 @@ async def test_critical_section_attempts_synthesis(monkeypatch, tmp_path):
         "cadence_ok": True, "has_cot_or_stub": False, "feedback": "",
     })
 
-    settings = HermesSettings()
+    settings = NewsAgentSettings()
     settings.storage.dir = tmp_path
     cad = resolve_cadence("monthly")
     semaphore = asyncio.Semaphore(1)
@@ -141,7 +141,7 @@ async def test_thin_corpus_flag_reaches_writer_prompt(monkeypatch, tmp_path):
     Capture the prompt the writer is given; assert the thin-corpus note is
     present so the writer is honest about gaps rather than fabricating.
     """
-    from hermes.pipeline import orchestrator as orch
+    from newsagent.pipeline import orchestrator as orch
 
     sec = SectionSpec(number=6, title="Funding, M&A & Business", bullets=["rounds"])
     spec = BriefSpec(title="T", sections=[sec])
@@ -171,7 +171,7 @@ async def test_thin_corpus_flag_reaches_writer_prompt(monkeypatch, tmp_path):
         "cadence_ok": True, "has_cot_or_stub": False, "feedback": "",
     })
 
-    settings = HermesSettings()
+    settings = NewsAgentSettings()
     settings.storage.dir = tmp_path
     cad = resolve_cadence("monthly")
     semaphore = asyncio.Semaphore(1)
@@ -192,7 +192,7 @@ async def test_ok_section_has_no_thin_corpus_flag(tmp_path):
     """OK sections (well-covered) must NOT carry the THIN CORPUS flag — they
     are not thin, and the writer is free to write normally.
     """
-    from hermes.pipeline import orchestrator as orch
+    from newsagent.pipeline import orchestrator as orch
 
     sec = SectionSpec(number=6, title="Funding, M&A & Business", bullets=["rounds"])
     spec = BriefSpec(title="T", sections=[sec])
@@ -222,7 +222,7 @@ async def test_ok_section_has_no_thin_corpus_flag(tmp_path):
         "cadence_ok": True, "has_cot_or_stub": False, "feedback": "",
     })
 
-    settings = HermesSettings()
+    settings = NewsAgentSettings()
     settings.storage.dir = tmp_path
     cad = resolve_cadence("monthly")
     semaphore = asyncio.Semaphore(1)

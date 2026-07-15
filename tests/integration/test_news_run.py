@@ -12,10 +12,10 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from hermes.config import HermesSettings
-from hermes.pipeline.orchestrator import run_news_pipeline
-from hermes.pipeline.search import SearchResult
-from hermes.pipeline.spec import BriefSpec, SectionSpec
+from newsagent.config import NewsAgentSettings
+from newsagent.pipeline.orchestrator import run_news_pipeline
+from newsagent.pipeline.search import SearchResult
+from newsagent.pipeline.spec import BriefSpec, SectionSpec
 
 
 SIMPLE_PROMPT = """# Test Report
@@ -67,7 +67,7 @@ def _fake_router(text: str = "synthesized prose") -> MagicMock:
     r.complete = AsyncMock()
     r.json_complete = AsyncMock(return_value={})
 
-    from hermes.llm.providers.base import ProviderResult
+    from newsagent.llm.providers.base import ProviderResult
 
     r.complete.return_value = ProviderResult(
         text=text, model="test", provider="test", prompt_tokens=10, completion_tokens=20
@@ -75,8 +75,8 @@ def _fake_router(text: str = "synthesized prose") -> MagicMock:
     return r
 
 
-def _make_settings(tmp_path: Path) -> HermesSettings:
-    s = HermesSettings()
+def _make_settings(tmp_path: Path) -> NewsAgentSettings:
+    s = NewsAgentSettings()
     s.storage.dir = tmp_path
     return s
 
@@ -112,7 +112,7 @@ async def test_orchestrator_refuses_write_when_required_deliverable_missing(tmp_
     # already on disk. Task 4 makes the gate a pre-write refusal: any
     # required deliverable that didn't make it into the assembled text
     # raises PipelineRefusedError and the report file is never written.
-    from hermes.errors import PipelineRefusedError
+    from newsagent.errors import PipelineRefusedError
 
     settings = _make_settings(tmp_path)
     out_file = tmp_path / "out.md"
@@ -146,7 +146,7 @@ async def test_orchestrator_writes_when_required_deliverable_present(tmp_path, m
     # (which is intentionally strict on a fake LLM router) by replacing
     # _synthesize_section_parallel with a stub that emits a section that
     # includes a model-comparison table — the brief's deliverable keyword.
-    from hermes.pipeline import orchestrator
+    from newsagent.pipeline import orchestrator
 
     settings = _make_settings(tmp_path)
     out_file = tmp_path / "out.md"
@@ -188,7 +188,7 @@ async def test_orchestrator_writes_frontier_table_when_corpus_has_models(tmp_pat
     # the requirement; this test proves the writer *obeys* it. The frontier
     # section is the one that previously shipped as a shallow prose-only
     # block; without this assertion the regression is silent.
-    from hermes.pipeline import orchestrator
+    from newsagent.pipeline import orchestrator
 
     settings = _make_settings(tmp_path)
     spec = BriefSpec(
@@ -256,7 +256,7 @@ async def test_dated_report_filename_unique_per_run(tmp_path, monkeypatch):
     # the same prompt overwrote the dated file. Fix: each run also writes a
     # unique dated archive {timestamp}_{content_hash}.md, while the canonical
     # slug-based file remains the latest-wins copy.
-    from hermes.pipeline import orchestrator
+    from newsagent.pipeline import orchestrator
 
     settings = _make_settings(tmp_path)
     spec = BriefSpec(

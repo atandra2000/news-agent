@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from hermes.collectors.base import RawItem
-from hermes.collectors.registry import REGISTRY, get_collector, run_collector
-from hermes.dedup import Deduper, simhash
-from hermes.llm.embed import Embedder, cosine
+from newsagent.collectors.base import RawItem
+from newsagent.collectors.registry import REGISTRY, get_collector, run_collector
+from newsagent.dedup import Deduper, simhash
+from newsagent.llm.embed import Embedder, cosine
 
 
 def test_simhash_near_dup():
@@ -55,7 +55,7 @@ def test_rss_collector_continues_after_per_feed_404(monkeypatch):
     import asyncio
     import httpx
 
-    from hermes.collectors.rss import RSSCollector
+    from newsagent.collectors.rss import RSSCollector
 
     bad_url = "https://example.invalid/rss-broken.xml"
     good_url = "https://example.valid/rss-good.xml"
@@ -117,7 +117,7 @@ def test_rss_item_stamps_category_per_feed(monkeypatch):
     import asyncio
     import httpx
 
-    from hermes.collectors.rss import RSSCollector
+    from newsagent.collectors.rss import RSSCollector
 
     openai_xml = """<?xml version="1.0"?><rss><channel>
       <title>OpenAI News</title>
