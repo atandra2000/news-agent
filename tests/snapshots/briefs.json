@@ -1,0 +1,94 @@
+{
+  "_comment": "Per-brief metadata for the brief prompt test harness. min_bytes/max_bytes enforce ~20% drift detection on rewrites. section_count is the number of '## N. ...' Report Structure sections (the floor for a useful report). comparison_sections lists the section numbers (1-indexed) that compare entities and should have a Markdown comparison table in the rendered report.",
+
+  "example_prompt.md": {
+    "min_bytes": 4500,
+    "max_bytes": 9000,
+    "section_count": 18,
+    "comparison_sections": [2, 3, 4, 5, 7, 8, 10, 11]
+  },
+  "ai_news_daily.md": {
+    "min_bytes": 2500,
+    "max_bytes": 5500,
+    "section_count": 6,
+    "comparison_sections": [6]
+  },
+  "ai_news_weekly.md": {
+    "min_bytes": 3000,
+    "max_bytes": 6000,
+    "section_count": 8,
+    "comparison_sections": [2, 7]
+  },
+  "ai_news_monthly.md": {
+    "min_bytes": 4500,
+    "max_bytes": 8500,
+    "section_count": 10,
+    "comparison_sections": [3, 6, 9]
+  },
+  "frontier_models.md": {
+    "min_bytes": 2500,
+    "max_bytes": 5500,
+    "section_count": 6,
+    "comparison_sections": [2, 4, 5]
+  },
+  "ai_hardware_infra.md": {
+    "min_bytes": 2500,
+    "max_bytes": 5500,
+    "section_count": 7,
+    "comparison_sections": [2, 3, 6]
+  },
+  "ai_agents_coding.md": {
+    "min_bytes": 2500,
+    "max_bytes": 6000,
+    "section_count": 7,
+    "comparison_sections": [4]
+  },
+  "ai_open_source_ecosystem.md": {
+    "min_bytes": 2900,
+    "max_bytes": 6500,
+    "section_count": 8,
+    "comparison_sections": [2, 4]
+  },
+  "ai_funding_ma.md": {
+    "min_bytes": 2400,
+    "max_bytes": 5500,
+    "section_count": 7,
+    "comparison_sections": [2]
+  },
+  "ai_research_papers.md": {
+    "min_bytes": 2500,
+    "max_bytes": 5500,
+    "section_count": 9,
+    "comparison_sections": []
+  },
+  "ai_safety_alignment.md": {
+    "min_bytes": 2500,
+    "max_bytes": 6000,
+    "section_count": 8,
+    "comparison_sections": [2]
+  },
+  "ai_regulation_policy.md": {
+    "min_bytes": 2400,
+    "max_bytes": 5500,
+    "section_count": 9,
+    "comparison_sections": [7]
+  },
+  "ai_industry_adoption.md": {
+    "min_bytes": 3000,
+    "max_bytes": 6500,
+    "section_count": 9,
+    "comparison_sections": [2, 3, 5]
+  },
+  "ai_multimodal_vision.md": {
+    "min_bytes": 2800,
+    "max_bytes": 7500,
+    "section_count": 8,
+    "comparison_sections": [2, 3, 4, 5]
+  },
+  "ai_companies_startups.md": {
+    "min_bytes": 3000,
+    "max_bytes": 6500,
+    "section_count": 8,
+    "comparison_sections": [3, 7]
+  }
+}
