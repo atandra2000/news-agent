@@ -2,6 +2,14 @@
 
 **Cadence:** monthly retrospective, 30-day lookback window.
 
+> ⚠️ **Thin-corpus tip:** the 2026-07-13 monthly run shipped with 60 sources
+> for 10 sections and 5 sections short-circuited to a "section omitted"
+> placeholder (Funding, Regulation, Enterprise, Predictions, one more). The
+> 15 free collectors cannot surface funding rounds, regulatory actions, or
+> community sentiment on their own. Enable live web research before running
+> the monthly cadence: set `NEWSAGENT_SEARCH_BACKEND=tavily` and
+> `NEWSAGENT_SEARCH_TAVILY_API_KEY=<key>` in `.env`.
+
 Autonomous monthly retrospective. Synthesizes the past 30 days into a
 narrative: what happened, why it mattered, how it changed the industry,
 and what comes next. Reads like a hybrid of the Stanford AI Index and

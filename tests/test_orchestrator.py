@@ -29,8 +29,6 @@ async def test_thin_section_attempts_synthesis(monkeypatch, tmp_path):
     silently dropped the section. Now: the section is always attempted; the
     writer prompt receives a "thin corpus" flag; a substantial synthesis wins.
     """
-    from newsagent.pipeline import orchestrator as orch
-
     sec = SectionSpec(number=6, title="Funding, M&A & Business", bullets=["rounds"])
     spec = BriefSpec(title="T", sections=[sec])
     sources = [
@@ -87,8 +85,6 @@ async def test_critical_section_attempts_synthesis(monkeypatch, tmp_path):
     uses ``CRITICAL`` to exercise the exact code path that was removed; it
     would fail on the old code.
     """
-    from newsagent.pipeline import orchestrator as orch
-
     sec = SectionSpec(number=6, title="Funding, M&A & Business", bullets=["rounds"])
     spec = BriefSpec(title="T", sections=[sec])
     sources = [
@@ -141,8 +137,6 @@ async def test_thin_corpus_flag_reaches_writer_prompt(monkeypatch, tmp_path):
     Capture the prompt the writer is given; assert the thin-corpus note is
     present so the writer is honest about gaps rather than fabricating.
     """
-    from newsagent.pipeline import orchestrator as orch
-
     sec = SectionSpec(number=6, title="Funding, M&A & Business", bullets=["rounds"])
     spec = BriefSpec(title="T", sections=[sec])
     sources = [
@@ -192,8 +186,6 @@ async def test_ok_section_has_no_thin_corpus_flag(tmp_path):
     """OK sections (well-covered) must NOT carry the THIN CORPUS flag — they
     are not thin, and the writer is free to write normally.
     """
-    from newsagent.pipeline import orchestrator as orch
-
     sec = SectionSpec(number=6, title="Funding, M&A & Business", bullets=["rounds"])
     spec = BriefSpec(title="T", sections=[sec])
     sources = [

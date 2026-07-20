@@ -2,6 +2,15 @@
 
 **Cadence:** annual synthesis. Full-spectrum retrospective over the past 12 months.
 
+> ⚠️ **Thin-corpus tip:** if the run logs `search_empty_fallback_collectors` or
+> the report header shows `Thin-corpus run: <60 sources for N sections>`, enable
+> live web research: set `NEWSAGENT_SEARCH_BACKEND=tavily` and
+> `NEWSAGENT_SEARCH_TAVILY_API_KEY=<key>` in `.env`. The 15 free collectors
+> (arXiv, HN, GitHub, RSS, …) cannot surface funding rounds, regulatory
+> actions, or community sentiment on their own; without Tavily, several
+> sections will short-circuit to an explicit "section omitted" placeholder
+> rather than fabricating coverage.
+
 This is a comprehensive research brief requesting a full-spectrum analysis of
 the AI industry for 2026. The report should synthesize developments across
 research, models, products, benchmarks, industry moves, and community

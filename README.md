@@ -6,7 +6,7 @@
 
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-237%20passing-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-291%20passing-brightgreen.svg)](tests/)
 
 **Version 0.1.0** · Python ≥ 3.11 · SQLite + httpx + structlog · Author: Atandra Bharati
 
@@ -72,8 +72,8 @@ controls lookback window, per-section source count, and citation thresholds.
 ```bash
 # 1. Clone + install (editable, with dev deps).
 git clone <repo> && cd newsagent
-python -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"
+uv venv --python 3.12 .venv
+uv pip install -e ".[dev]"
 
 # 2. Configure.
 cp .env.example .env
@@ -82,13 +82,10 @@ cp .env.example .env
 # 3. Verify your LLM provider + model catalog is live.
 newsagent models
 
-# 4. Verify your LLM provider + model catalog is live.
-newsagent models
-
-# 5. Run the unified pipeline.
+# 4. Run the unified pipeline.
 newsagent news example_prompt.md
 
-# 6. Read the report.
+# 5. Read the report.
 open storage/reports/$(date +%Y-%m-%d).md
 ```
 
@@ -104,8 +101,15 @@ newsagent eval example_prompt.md --rate 4
 > virtualenv's Python (`.venv/bin/python`), because the base `python`/`python3`
 > may lack `structlog` and the dev extras:
 > ```bash
-> .venv/bin/python -m pytest tests/ -q      # 237 tests, offline, no network/LLM
+> .venv/bin/python -m pytest tests/ -q      # 291 tests, offline, no network/LLM
 > .venv/bin/python -m ruff check src tests
+> ```
+>
+> **If the parent shell has a stale `PYTHONPATH`** pointing at a different
+> venv (e.g. another project's `.venv`), `import` errors surface. Run with a
+> clean environment in that case:
+> ```bash
+> env -u PYTHONPATH .venv/bin/python -m pytest tests/ -q
 > ```
 
 ---
@@ -176,7 +180,7 @@ newsagent/
 │   ├── output.py              # Sinks: MarkdownFileSink + ObsidianSink
 │   └── profiles.py            # daily / weekly / minimal / deep_dive / trend_report
 ├── docs/                      # This documentation set (see index below)
-├── tests/                     # 237 tests (unit + integration), offline
+├── tests/                     # 291 tests (unit + integration), offline
 ├── prompts/                   # Example brief prompts
 ├── scheduler/                 # launchd / systemd / cron templates
 └── storage/                   # SQLite DB, reports, manifests, quality (gitignored)
@@ -197,6 +201,8 @@ newsagent/
 | [docs/STORAGE.md](docs/STORAGE.md) | SQLite schema, vector store, KG, forward-migration |
 | [docs/TESTING.md](docs/TESTING.md) | Test layout, fixtures, helpers, running the suite, adding tests |
 | [docs/CLI.md](docs/CLI.md) | All CLI commands, flags, scheduler setup |
+| [docs/SECURITY.md](docs/SECURITY.md) | Threat model, credential handling, output handling, out-of-scope |
+| [docs/COST.md](docs/COST.md) | Per-run cost breakdown, `cost_per_1k_tokens` estimate, hard caps, cost-reduction levers |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Dev setup, testing, lint, code style |
 | [CHANGELOG.md](CHANGELOG.md) | Release history |
 
@@ -235,7 +241,7 @@ newsagent/
 | LLM | Ollama / OpenCode Go / OpenAI-compatible | Role-routed fallback chain, per-tier catalog |
 | Search | Tavily (optional) | Brief pipeline live web research |
 | Templates | Jinja2 | Versioned prompt templates |
-| Testing | pytest + pytest-asyncio + respx | 237 tests, offline, no network/LLM server |
+| Testing | pytest + pytest-asyncio + respx | 291 tests, offline, no network/LLM server |
 
 ---
 
