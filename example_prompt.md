@@ -70,7 +70,7 @@ sentiment signal, never as fact.
 
 # Synthesis Directives
 
-The writer MUST apply these synthesis verbs to every section. Mere chronology
+Apply these synthesis verbs to every section. Mere chronology
 or restatement of sources is not synthesis; the report must compare, rank,
 quantify, and contrast.
 
@@ -92,8 +92,8 @@ quantify, and contrast.
 
 # Report Structure
 
-_(use 15-25 sources per section; prefer 2 official + 2 research + 1 news + 1
-community)_
+_(use 15-25 sources per section; mix official, research, news, and
+community voices — prefer primary sources)_
 
 ## 1. Executive Summary
 - biggest breakthroughs

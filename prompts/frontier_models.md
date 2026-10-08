@@ -63,7 +63,7 @@ skepticism and real adoption signal. Use for sentiment, never as fact.
 
 # Synthesis Directives
 
-The writer MUST apply these synthesis verbs to every section. A list
+Apply these synthesis verbs to every section. A list
 of model releases is not a frontier-model brief.
 
 1. **Rank models by capability on the user's task**, not by release

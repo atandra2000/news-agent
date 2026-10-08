@@ -58,7 +58,7 @@ async def judge(ctx: RunContext, newsagent_text: str) -> dict:
         "You are a strict self-evaluator. Score THIS report on six dimensions (1-5, 5 best): "
         + ", ".join(RUBRIC)
         + ". Also give 3 concrete improvement notes. Return STRICT JSON: "
-        '{"scores": {dim: score}, "notes": [str]}. Return ONLY JSON.\n\n'
+        '{"scores": {dim: score}, "notes": [str]}. Return JSON matching the schema in this prompt.\n\n'
         f"=== REPORT ===\n{newsagent_text[:6000]}"
     )
     data = await ctx.router.json_complete("critic", prompt)

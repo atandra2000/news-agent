@@ -22,7 +22,7 @@ Standards to enforce (SemiAnalysis, The Economist, McKinsey, Anthropic quality):
 - Surface contradictions between sources explicitly
 - Use causal narratives: Event → Cause → Impact → Winners/Losers
 - Every major story covers: What/Why/How/Technical/Business/Developer/Long-term
-- Executive summary must be 3-5 sentences of pure significance (no fluff)
+- Executive summary must be pure significance (no fluff)
 - Sections must flow into each other (not be isolated blocks)
 
 SECTIONS TO REVIEW:
@@ -51,9 +51,8 @@ Evaluate the report and return JSON:
 }
 
 RULES:
-- Be harsh. Professional intelligence firms reject mediocre reports.
 - A score below 0.65 means rejection.
 - Planning leakage is an automatic rejection.
 - Summary language without synthesis is an automatic rejection.
 - Every rejection must include specific rewrite_instructions.
-- Return ONLY JSON. No prose.
+- Return JSON matching the schema in this template.

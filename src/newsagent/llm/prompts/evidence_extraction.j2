@@ -1,7 +1,7 @@
 {# evidence_extraction.j2 — Extract structured evidence from raw content.
 
    No summarization. Only extraction. #}
-Extract structured evidence from this content. Return ONLY JSON.
+Extract structured evidence from this content. Return JSON matching the schema in this template.
 
 SOURCE: {{ source_type }}
 TITLE: {{ title }}
@@ -31,4 +31,4 @@ Return JSON:
   "category": "paper|model|product|event|funding"
 }
 
-Return ONLY JSON. No prose.
+Return JSON matching the schema in this template.

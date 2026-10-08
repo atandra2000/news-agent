@@ -131,7 +131,7 @@ frameworks — each is a prompt + a control loop implemented in the agent module
 
 | Primitive | Shape | Used by | Rubric dim |
 |---|---|---|---|
-| **Chain-of-Thought (CoT)** | "think step by step; show reasoning; then emit structured answer" | Planning, Research synthesis, Trend narration | Depth |
+| **Explicit plan** | three decision questions → one structured action | Planning, Research synthesis, Trend narration | Depth |
 | **ReAct research loop** | `thought → action(tool) → observation →` repeat, bounded | Research Agent | Depth, Coverage |
 | **Claim triangulation** | extract claims → retrieve independent sources → score corroboration | Verification Agent | Accuracy, Trust |
 | **Rubric-conditioned critique** | judge draft against the 6-dim rubric → structured fixes | Critic Agent | Accuracy, Usefulness |
@@ -422,19 +422,18 @@ Working state:
   open_questions: {{questions}}
   gathered_facts: {{facts_so_far}}        # each with source ref
   working_analysis: {{draft_analysis}}
-  remaining_token_budget: {{budget_left}}
   loop_depth: {{depth}} / cap {{depth_cap}}
 
-Think step by step:
+Decide:
   1. Which open question is most important and still unanswered?
   2. What action (from ActionSpace) best advances it?
-  3. If no useful action remains or budget low → STOP.
+  3. If no useful action remains → STOP.   # budget exhaustion is a loop-side stop
 
 Output (strict JSON):
 {
   "action": str,                 # one of ActionSpace
   "target": str,                 # query/url/entity for the action
-  "thought": str,                # CoT, ≤120 words
+  "thought": str,                # brief rationale for the action
   "stop": bool
 }
 ```

@@ -70,11 +70,11 @@ and adoption signal. Use for sentiment, never as fact.
 
 # Synthesis Directives
 
-The writer MUST apply these synthesis verbs to every section. A
+Apply these synthesis verbs to every section. A
 daily brief is small; every sentence must add signal.
 
 1. **Lead with significance, not chronology.** The executive summary
-   should be 3-5 sentences of pure significance — no fluff, no
+   is pure significance — no fluff, no
    throat-clearing.
 2. **Compare to the prior day** where the source set allows — what
    shifted, what was incremental, what was retracted.

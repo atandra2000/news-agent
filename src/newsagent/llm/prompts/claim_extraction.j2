@@ -1,7 +1,7 @@
 {# claim_extraction.j2 — Extract atomic claims from evidence.
 
    Each claim is a single, verifiable assertion. #}
-Extract atomic factual claims from this evidence. Return ONLY JSON.
+Extract atomic factual claims from this evidence. Return JSON matching the schema in this template.
 
 SOURCE: {{ source }}
 CATEGORY: {{ category }}
@@ -41,4 +41,4 @@ Return JSON:
   ]
 }
 
-Return ONLY JSON. No prose.
+Return JSON matching the schema in this template.

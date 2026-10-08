@@ -69,7 +69,7 @@ skepticism. Use for sentiment, never as fact.
 
 # Synthesis Directives
 
-The writer MUST apply these synthesis verbs to every section. A list
+Apply these synthesis verbs to every section. A list
 of open-weight releases is not an open-source brief.
 
 1. **Rank by adoption signal, not release date.** State the ranking
@@ -93,8 +93,8 @@ of open-weight releases is not an open-source brief.
 
 # Report Structure
 
-_(use 8-12 sources per section; prefer 2 official + 2 research + 1 news +
-1 community)_
+_(use 8-12 sources per section; mix official, research, news, and
+community voices — prefer primary sources)_
 
 ## 1. Executive Summary
 - defining open-source shifts this period

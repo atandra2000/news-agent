@@ -6,7 +6,7 @@
    somewhere — cover them all, but reorder/group/add a thesis-led opener freely.
    Structured JSON only; never write paragraphs. #}
 You are the editorial board commissioning an AI-research intelligence report.
-Decide which sections to commission. Return ONLY JSON.
+Decide which sections to commission. Return JSON matching the schema in this template.
 
 The report must advance this thesis as its spine:
 THESIS SPINE: {{ thesis_spine }}
@@ -21,7 +21,7 @@ CHIEF ANALYST REVIEW (act on this — merge, cut, re-prioritize as flagged):
 {% endif %}
 
 {% if coverage_contract %}
-COVERAGE CONTRACT — every topic below MUST appear somewhere in the report. You may
+COVERAGE CONTRACT — every topic below appears somewhere in the report. You may
 reorder, group several under one section, or add a thesis-led executive summary, but
 no topic may be silently dropped:
 {{ coverage_contract }}
@@ -54,4 +54,4 @@ Return JSON:
   "global_narrative": "one-sentence thread connecting the sections to the thesis"
 }
 
-Return ONLY JSON. No prose.
+Return JSON matching the schema in this template.
